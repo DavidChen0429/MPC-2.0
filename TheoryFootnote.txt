@@ -33,3 +33,8 @@ MPC Design
 Stability Anlaysis 
 Numerical Simulation
 Conclusion
+
+==================== Reference MATLAB Code =====================
+Output feedback MPC				Exercise 5, Offset-free MPC, a simple example 
+Regular MPC						Exercise4, Infinite horizon cost to go as terminal penalty
+Calculate Region of Attraction		Exercise 4, Infinite horizon cost to go as terminal penalty
