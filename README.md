@@ -3,7 +3,8 @@
 This repository is created for the assignment: A MPC Approach in HIV Therapy. Below are file explanation
 
 ============ PDF
-MPC HIV: Original paper that contains model for HIV therapy and MPC design
+
+MPC HIV: Original paper that contains a model for HIV therapy and MPC design
 A_MPC...: Reference report from this year that got a 9 and love from Sergio
 
 ============ Text
