@@ -2,7 +2,7 @@ import casadi as ca
 import numpy as np
 import control as ctrl
 import cvxpy as cp
-import pybullet as p
+#import pybullet as p
 
 
 
@@ -48,7 +48,7 @@ class Quadrotor:
         # non linear dynamics
         x_x, x_y, x_z, x_phi, x_theta, x_psi, x_dx, x_dy, x_dz, x_dphi, x_dtheta, x_dpsi = ca.vertsplit(self.x, 1)
         u_F, u_Tx, u_Ty, u_Tz = ca.vertsplit(self.u, 1)
-
+        print(type(self.u))
         dx_x = x_dx
         dx_y = x_dy
         dx_z = x_dz
@@ -163,3 +163,7 @@ class Quadrotor:
             u, _, point_id, line_id = self.mpc(x, x_ref, A_ineq, b_ineq, Q=np.diag([1,1,1,0,0,0,0,0,0,0,0,0]), R=np.eye(4), N=10, render=True, deltaB=info_dict["deltaB"],dynamic=dynamic)
         x_next = self.dsys.A @ x + self.dsys.B @ u
         return x_next,point_id, line_id
+
+if __name__ == "__main__":
+    model = Quadrotor()
+    print(model.n_states)
