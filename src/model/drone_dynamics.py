@@ -48,7 +48,7 @@ class Quadrotor:
         # non linear dynamics
         x_x, x_y, x_z, x_phi, x_theta, x_psi, x_dx, x_dy, x_dz, x_dphi, x_dtheta, x_dpsi = ca.vertsplit(self.x, 1)
         u_F, u_Tx, u_Ty, u_Tz = ca.vertsplit(self.u, 1)
-        print(type(self.u))
+
         dx_x = x_dx
         dx_y = x_dy
         dx_z = x_dz

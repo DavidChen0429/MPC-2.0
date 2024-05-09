@@ -2,6 +2,7 @@ import casadi as ca
 import numpy as np
 import control as ctrl
 import cvxpy as cp
+import matplotlib.pyplot as plt
 
 class HIV_model:
     def __init__(self):
@@ -23,9 +24,10 @@ class HIV_model:
         self.csys = 0
 
         # build dynamics etc
-        x_operating = np.zeros((5, 1))
-        u_operating = np.array([0])
-        self.A, self.B, self.C, self.D = self.linearize(x_operating, u_operating)
+        self.x_operating = self.x_eq
+        self.u_operating = 0.0
+        self.A, self.B, self.C, self.D = self.linearize(self.x_operating, self.u_operating) # linearize around equilibrium
+        #print(self.A, "\n", self.B, "\n", self.C, "\n", self.D)
         self.K = self.make_dlqr_controller()
     
     def build_x_dot(self):
@@ -46,6 +48,15 @@ class HIV_model:
         q = 0.5
         eta = 0.9799
         h = 0.1
+        
+        # successful therapy  (according to the paper)
+        y_eq = ((c2*(lamb-d*q)-b2*beta)-np.sqrt((c2*(lamb-d*q)-b2*beta)**2-4*beta*c2*q*d*b2))/(2*beta*c2*q)
+        x_eq = lamb/(d+beta*y_eq)
+        z1_eq = 0.0
+        z2_eq = (y_eq*c2*(beta*q-a)+b2*beta)/(c2*p2*y_eq)
+        w_eq = (h*z2_eq)/(c2*q*y_eq)
+        self.x_eq = np.array([x_eq, y_eq, z1_eq, z2_eq, w_eq]).reshape((5, 1))
+        #print("Successful therapy equilibrium [x,y,z1,z2,w]: ", self.x_eq)
 
         # nonlinear dynamic 
         x_x, x_y, x_z1, x_z2, x_w = ca.vertsplit(self.x, 1)
@@ -85,15 +96,18 @@ class HIV_model:
         return x_next
 
     def make_dlqr_controller(self):
-        x_operating = np.zeros((5, 1))
-        u_operating = np.array([1.0]).reshape((1, 1))
-        A, B, C, D = self.linearize(x_operating, u_operating)
+        #A, B, C, D = self.linearize(self.x_operating, self.u_operating)
         Q = np.eye(5)
         R = np.eye(1)
-        sys_continuous = ctrl.ss(A, B, C, D)
+        sys_continuous = ctrl.ss(self.A, self.B, self.C, self.D)
         self.csys = sys_continuous
         sys_discrete = ctrl.c2d(sys_continuous, self.dt, method='zoh')
         self.dsys = sys_discrete
+
+        """print("Discrete time system: ", self.dsys)
+        print("Q: ", Q)
+        print("R: ", R)"""
+
         K, _, _ = ctrl.dlqr(self.dsys.A, self.dsys.B, Q, R)
         return K
 
@@ -118,16 +132,16 @@ class HIV_model:
             #cons += [x[2, i]==x0[2]]
 
             if deltaB is not None:
-                cons += [(A_ineq @ x[0:3, i])<= (b_ineq + np.array(deltaB) * i).flatten()]
+                cons += [(A_ineq @ x[:, i])<= (b_ineq + np.array(deltaB) * i).flatten()]
 
         u_max = np.array([1.0])
         u_min = np.array([0.0])
         if dynamic==True:
-            cons += [u <= np.array([u_max]).T, u >= np.array([u_min]).T]
-            cons += [x[6:9,:] <= 2*np.ones((3,1)), x[6:9,:] >= -2*np.ones((3,1))]
+            cons += [u <= np.array([u_max]).T, u >= np.array([u_min]).T]    # input constraints
+            cons += [x <= 1*np.ones((5,1)), x >= 0*np.ones((3,1))]          # state constraints
 
         if deltaB is None:
-            cons += [A_ineq @ x[0:3, :] <= b_ineq]
+            cons += [A_ineq @ x[:, :] <= b_ineq]
 
         prob = cp.Problem(obj, cons)
         prob.solve(verbose=False)
@@ -159,9 +173,27 @@ class HIV_model:
 
 if __name__ == "__main__":
     model = HIV_model()
-    print(model.n_states)
-    """model.nonlinear_dyn()
-    x = np.array([1, 1, 1, 1, 1])
-    u = np.array([1])
-    x_next = model.compute_next_state(x, u)
-    print(x_next)"""
+    #print(model.n_states)
+    #print(model.A, model.B, model.C, model.D, model.K)
+    
+    # simulate the system dynamics 
+    x_init = np.array([10, 0.1, 0.1, 0.1, 0.1])
+    u_init = np.array([0])
+    x_next = model.compute_next_state(x_init, u_init)
+    x_values = [x_next[0]]
+    y_values = [x_next[1]]
+    w_values = [x_next[4]]
+    for i in range(100):
+        x_next = model.compute_next_state(x_next, 1)
+        x_values.append(x_next[0])
+        y_values.append(x_next[1])
+        w_values.append(x_next[4])
+    x_values = np.array(x_values).reshape((101, 1))
+    y_values = np.array(y_values).reshape((101, 1))
+    w_values = np.array(w_values).reshape((101, 1))
+    t = np.linspace(0, 10, 101)
+    plt.plot(t, x_values, label="x")
+    plt.plot(t, y_values, label="y")
+    plt.plot(t, w_values, label="w")
+    plt.legend()
+    plt.show()
