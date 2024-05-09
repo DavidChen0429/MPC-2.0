@@ -13,6 +13,10 @@ This repository is created for the assignment: A MPC Approach in HIV Therapy. Th
 
 *TheoryFootnote*: Note from reading the MPC textbook about proving stability
 
+## **figure**
+
+Store the figures
+
 ## **Src**
  
 ### **model**
