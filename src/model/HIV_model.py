@@ -47,7 +47,7 @@ class HIV_model:
         lamb = 1.0
         q = 0.5
         eta = 0.9799
-        h = 0.1
+        h = 0.01
         
         # successful therapy  (according to the paper)
         y_eq = ((c2*(lamb-d*q)-b2*beta)-np.sqrt((c2*(lamb-d*q)-b2*beta)**2-4*beta*c2*q*d*b2))/(2*beta*c2*q)
