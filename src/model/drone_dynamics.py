@@ -166,4 +166,4 @@ class Quadrotor:
 
 if __name__ == "__main__":
     model = Quadrotor()
-    print(model.n_states)
+    print("A:", model.A, "\nB:", model.B, "\nC:", model.C, "\nD:", model.D)

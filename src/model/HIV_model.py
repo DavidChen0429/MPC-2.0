@@ -28,6 +28,22 @@ class HIV_model:
         self.u_operating = 0.0
         self.A, self.B, self.C, self.D = self.linearize(self.x_operating, self.u_operating) # linearize around equilibrium
         #print(self.A, "\n", self.B, "\n", self.C, "\n", self.D)
+
+        # Check controllability
+        C = np.hstack((self.B, self.A @ self.B, self.A**2 @ self.B, self.A**3 @ self.B, self.A**4 @ self.B))
+        rank = np.linalg.matrix_rank(C)
+        if rank == self.n_states:
+            print("The system is controllable.")
+        else:
+            print("The system is not controllable.")
+
+        # Check observability
+        O = np.vstack((self.C, self.C @ self.A, self.C @ self.A**2, self.C @ self.A**3, self.C @ self.A**4))
+        rank = np.linalg.matrix_rank(O)
+        if rank == self.n_states:
+            print("The system is observable.")
+        else:
+            print("The system is not observable.")
         self.K = self.make_dlqr_controller()
     
     def build_x_dot(self):
@@ -41,13 +57,13 @@ class HIV_model:
         d = 0.1
         beta = 1.0
         a = 0.2
-        p1, p2 = 1.0, 1.0
-        c1, c2 = 1.0, 1.0
+        p1, p2 = 1.0, 2.0
+        c1, c2 = 0.03, 0.06
         b1, b2 = 0.1, 0.01
         lamb = 1.0
         q = 0.5
         eta = 0.9799
-        h = 0.01
+        h = 0.1
         
         # successful therapy  (according to the paper)
         y_eq = ((c2*(lamb-d*q)-b2*beta)-np.sqrt((c2*(lamb-d*q)-b2*beta)**2-4*beta*c2*q*d*b2))/(2*beta*c2*q)
@@ -56,7 +72,7 @@ class HIV_model:
         z2_eq = (y_eq*c2*(beta*q-a)+b2*beta)/(c2*p2*y_eq)
         w_eq = (h*z2_eq)/(c2*q*y_eq)
         self.x_eq = np.array([x_eq, y_eq, z1_eq, z2_eq, w_eq]).reshape((5, 1))
-        #print("Successful therapy equilibrium [x,y,z1,z2,w]: ", self.x_eq)
+        print("Successful therapy equilibrium [x,y,z1,z2,w]: ", self.x_eq)
 
         # nonlinear dynamic 
         x_x, x_y, x_z1, x_z2, x_w = ca.vertsplit(self.x, 1)
@@ -173,27 +189,26 @@ class HIV_model:
 
 if __name__ == "__main__":
     model = HIV_model()
-    #print(model.n_states)
-    #print(model.A, model.B, model.C, model.D, model.K)
-    
-    # simulate the system dynamics 
-    x_init = np.array([10, 0.1, 0.1, 0.1, 0.1])
-    u_init = np.array([0])
-    x_next = model.compute_next_state(x_init, u_init)
-    x_values = [x_next[0]]
-    y_values = [x_next[1]]
-    w_values = [x_next[4]]
-    for i in range(100):
-        x_next = model.compute_next_state(x_next, 1)
-        x_values.append(x_next[0])
-        y_values.append(x_next[1])
-        w_values.append(x_next[4])
-    x_values = np.array(x_values).reshape((101, 1))
-    y_values = np.array(y_values).reshape((101, 1))
-    w_values = np.array(w_values).reshape((101, 1))
-    t = np.linspace(0, 10, 101)
-    plt.plot(t, x_values, label="x")
-    plt.plot(t, y_values, label="y")
-    plt.plot(t, w_values, label="w")
-    plt.legend()
-    plt.show()
+    print("A:", model.A, "\nB:", model.B, "\nC:", model.C, "\nD:", model.D)
+
+    # # simulate the system dynamics 
+    # x_init = np.array([10, 0.1, 0.1, 0.1, 0.1])
+    # u_init = np.array([0])
+    # x_next = model.compute_next_state(x_init, u_init)
+    # x_values = [x_next[0]]
+    # y_values = [x_next[1]]
+    # w_values = [x_next[4]]
+    # for i in range(100):
+    #     x_next = model.compute_next_state(x_next, 1)
+    #     x_values.append(x_next[0])
+    #     y_values.append(x_next[1])
+    #     w_values.append(x_next[4])
+    # x_values = np.array(x_values).reshape((101, 1))
+    # y_values = np.array(y_values).reshape((101, 1))
+    # w_values = np.array(w_values).reshape((101, 1))
+    # t = np.linspace(0, 10, 101)
+    # plt.plot(t, x_values, label="x")
+    # plt.plot(t, y_values, label="y")
+    # plt.plot(t, w_values, label="w")
+    # plt.legend()
+    # plt.show()
