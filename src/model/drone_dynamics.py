@@ -124,8 +124,8 @@ class Quadrotor:
             # if deltaB is not None:
             #     cons += [(A_ineq @ x[0:3, i])<= (b_ineq + np.array(deltaB) * i).flatten()]
 
-        u_max = np.array([29.4, 1.4715, 1.4715, 0.0196])
-        u_min = np.array([-9.8, -1.4715, -1.4715, -0.0196])
+        u_max = np.array([30, 1.4715, 1.4715, 0.0196])
+        u_min = np.array([-10, -1.4715, -1.4715, -0.0196])
         if dynamic==True:
             cons += [u <= np.array([u_max]).T, u >= np.array([u_min]).T]                            # Input limit
             cons += [x[6:9,:] <= 2*np.ones((3,1)), x[6:9,:] >= -2*np.ones((3,1))]                   # Speed limit
@@ -152,8 +152,8 @@ class Quadrotor:
         if cont_type == "LQR":
             u = self.K @ (x_ref - x)
             # Constrainted LQR
-            u_max = np.array([29.4, 1.4715, 1.4715, 0.0196])
-            u_min = np.array([-9.8, -1.4715, -1.4715, -0.0196])
+            u_max = np.array([30, 1.4715, 1.4715, 0.0196])
+            u_min = np.array([-10, -1.4715, -1.4715, -0.0196])
             u = np.clip(u, u_min, u_max)    # saturation function
         elif cont_type == "MPC":
             #A_ineq, b_ineq = info_dict["A"], info_dict["b"]
