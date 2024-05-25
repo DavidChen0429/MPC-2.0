@@ -4,7 +4,6 @@ from Planner import trajectory_generation
 #from Planner import SafeFlightPolytope
 import matplotlib.pyplot as plt
 import numpy as np
-import cvxpy as cp
 
 drone_model = drone_dynamics.Quadrotor()
 
@@ -39,6 +38,9 @@ x_ref = trajectory_generation.hover_traj(time_steps)  # reference trajectory (st
 # x_max = np.array([np.inf, np.inf, np.inf, np.pi/2, np.pi/2, np.inf, 2, 2, 2, np.inf, np.inf, np.inf])
 # x_min = np.array([-np.inf, -np.inf, -np.inf, -np.pi/2, -np.pi/2, -np.inf, -2, -2, -2, -np.inf, -np.inf, -np.inf])
 
+# Compute the Xf: invariant constraint admissible set
+
+
 # Simulation
 for k in range(time_steps-1):
     x_current = x_bag[:, k]
@@ -50,22 +52,25 @@ for k in range(time_steps-1):
 
 # Visualization
 plt.figure()
-plt.step(x_bag[0, :], '#1f77b4', label="x_x")
-plt.step(x_ref[0,:], '#1f77b4', linestyle='--', label="x_x ref")
-plt.step(x_bag[1, :], '#ff7f0e', label="x_y")
-plt.step(x_ref[1,:], '#ff7f0e', linestyle='--', label="x_y ref")
-plt.step(x_bag[2, :], '#2ca02c', label="x_z")
-plt.step(x_ref[2,:], '#2ca02c', linestyle='--', label="x_z ref")
+plt.step(time, x_bag[0, :], '#1f77b4', label="x_x")
+plt.step(time, x_ref[0,:], '#1f77b4', linestyle='--', label="x_x ref")
+plt.step(time, x_bag[1, :], '#ff7f0e', label="x_y")
+plt.step(time, x_ref[1,:], '#ff7f0e', linestyle='--', label="x_y ref")
+plt.step(time, x_bag[2, :], '#2ca02c', label="x_z")
+plt.step(time, x_ref[2,:], '#2ca02c', linestyle='--', label="x_z ref")
+#plt.step(x_bag[5, :], '#d62728', label="x_psi")
+plt.xlabel("Time [s]")
 plt.title("Constrainted LQR Hovering Simulation")
 plt.legend()
 plt.show()
 
 
 plt.figure()
-plt.step(u_bag[0, :], '#1f77b4', label="F")
-plt.step(u_bag[1, :], '#ff7f0e', label="Tx")
-plt.step(u_bag[2, :], '#2ca02c', label="Ty")
-plt.step(u_bag[3, :], '#d62728', label="Tz")
+plt.step(time, u_bag[0, :], '#1f77b4', label="F")
+plt.step(time, u_bag[1, :], '#ff7f0e', label="Tx")
+plt.step(time,u_bag[2, :], '#2ca02c', label="Ty")
+plt.step(time, u_bag[3, :], '#d62728', label="Tz")
+plt.xlabel("Time [s]")
 plt.title("Constrainted LQR Control Inputs")
 plt.legend()
 plt.show()
