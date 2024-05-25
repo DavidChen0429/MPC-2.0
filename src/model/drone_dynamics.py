@@ -173,6 +173,7 @@ if __name__ == "__main__":
     print("A:", model.A, "\nB:", model.B, "\nC:", model.C, "\nD:", model.D)
     print("K:", model.K.shape)
     print("P:", model.P.shape)
+    print("Eigenvalue of P:", np.linalg.eigvals(model.P))   # unique positive semi-definite solution of the Riccati equation
 
     # Check controlability
     if np.linalg.matrix_rank(ctrl.ctrb(model.A, model.B)) == model.n_states:
