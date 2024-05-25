@@ -24,15 +24,20 @@ x_ref = trajectory_generation.hover_traj(time_steps)  # reference trajectory (st
 
 # # === MPC definition
 # # ===== Cost function
-# Q=np.diag([1,1,1,0,0,0,0,0,0,0,0,0])
+# # ====== Stage cost
+# Q=np.eye(12)
 # R=np.eye(4)
+# # ====== Terminal cost
+# P = drone_model.P # Solution of the discrete time algebraic Riccati equation
 # # ===== Prediction Horizon
 # N=10
 # # ===== Constraints
 # # ======= Input contraints
-# u_max = np.array([29.4, 1.4715, 1.4715, 0.0196])
-# u_min = np.array([-9.8, -1.4715, -1.4715, -0.0196])
+# u_max = np.array([30, 1.4715, 1.4715, 0.0196])
+# u_min = np.array([-10, -1.4715, -1.4715, -0.0196])
 # # ======= State constraints
+# x_max = np.array([np.inf, np.inf, np.inf, np.pi/2, np.pi/2, np.inf, 2, 2, 2, np.inf, np.inf, np.inf])
+# x_min = np.array([-np.inf, -np.inf, -np.inf, -np.pi/2, -np.pi/2, -np.inf, -2, -2, -2, -np.inf, -np.inf, -np.inf])
 
 # Simulation
 for k in range(time_steps-1):

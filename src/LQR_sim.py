@@ -32,10 +32,6 @@ x_bag[:, 0] = x0
 u_bag[:, 0] = u0
 x_ref = trajectory_generation.hover_traj(time_steps)  # reference trajectory (state)
 
-# input contraints
-u_max = np.array([29.4, 1.4715, 1.4715, 0.0196])
-u_min = np.array([-9.8, -1.4715, -1.4715, -0.0196])
-
 # simulate the drone dynamics
 for k in range(time_steps-1):
     x_current = x_bag[:, k]

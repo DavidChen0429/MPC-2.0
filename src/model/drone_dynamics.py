@@ -30,7 +30,7 @@ class Quadrotor:
         x_operating = np.zeros((12, 1))
         u_operating = np.array([10, 0, 0, 0]).reshape((-1, 1))  # hovering (mg 0 0 0)
         self.A, self.B, self.C, self.D = self.linearize(x_operating, u_operating)
-        self.K = self.make_dlqr_controller()
+        self.K, self.P = self.make_dlqr_controller()
 
     def build_x_dot(self):
         self.x_dot = ca.vertcat(self.x[1], -self.x[0] + self.u)
@@ -101,8 +101,8 @@ class Quadrotor:
         self.csys = sys_continuous
         sys_discrete = ctrl.c2d(sys_continuous, self.dt, method='zoh')
         self.dsys = sys_discrete
-        K, _, _ = ctrl.dlqr(self.dsys.A, self.dsys.B, Q, R)
-        return K
+        K, P, _ = ctrl.dlqr(self.dsys.A, self.dsys.B, Q, R)
+        return K, P
 
     def get_ss_bag_vectors(self, N):
         """N is the number of simulation steps, thus number of concatinated x vectors"""
@@ -113,8 +113,9 @@ class Quadrotor:
     def mpc(self, x0, x_goal, A_ineq, b_ineq, Q=np.eye(12), R=np.eye(4), N=10, render=True, deltaB=None, dynamic=False):
         x = cp.Variable((12, N))
         u = cp.Variable((4, N))
-        cost = sum(cp.quad_form(x[:, i] - x_goal.T, Q) + cp.quad_form(u[:, i], R) for i in range(N))
-        cost += cp.quad_form(x[:3,N-1] - x_goal[:3], np.eye(3))
+        cost = sum(cp.quad_form(x[:, i] - x_goal.T, Q) + cp.quad_form(u[:, i], R) for i in range(N)) # stage cost
+        #cost += cp.quad_form(x[:3,N-1] - x_goal[:3], np.eye(3)) # terminal cost
+        cost += cp.quad_form(x[:, N-1] - x_goal.T, self.P) # terminal cost
         obj = cp.Minimize(cost)
 
         cons = [x[:, 0] == x0]
@@ -170,6 +171,8 @@ class Quadrotor:
 if __name__ == "__main__":
     model = Quadrotor()
     print("A:", model.A, "\nB:", model.B, "\nC:", model.C, "\nD:", model.D)
+    print("K:", model.K.shape)
+    print("P:", model.P.shape)
 
     # Check controlability
     if np.linalg.matrix_rank(ctrl.ctrb(model.A, model.B)) == model.n_states:
