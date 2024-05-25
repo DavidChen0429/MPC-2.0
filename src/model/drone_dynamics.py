@@ -28,7 +28,7 @@ class Quadrotor:
 
         # build dynamics etc
         x_operating = np.zeros((12, 1))
-        u_operating = np.array([10, 0, 0, 0]).reshape((-1, 1))
+        u_operating = np.array([10, 0, 0, 0]).reshape((-1, 1))  # hovering (mg 0 0 0)
         self.A, self.B, self.C, self.D = self.linearize(x_operating, u_operating)
         self.K = self.make_dlqr_controller()
 
@@ -117,53 +117,68 @@ class Quadrotor:
         cost += cp.quad_form(x[:3,N-1] - x_goal[:3], np.eye(3))
         obj = cp.Minimize(cost)
 
-        #cons = [x[:, 0] == self.dsys.A @ x0 + self.dsys.B @ u[:, 0]]
         cons = [x[:, 0] == x0]
-        #cons += [x[:3,N-1] == x_goal[:3]]
         for i in range(1, N):
-            cons += [x[:, i] == self.dsys.A @ x[:, i - 1] + self.dsys.B @ u[:, i-1]]
-            #cons += [x[2, i]==x0[2]]
+            cons += [x[:, i] == self.dsys.A @ x[:, i-1] + self.dsys.B @ u[:, i-1]]
 
-            if deltaB is not None:
-                cons += [(A_ineq @ x[0:3, i])<= (b_ineq + np.array(deltaB) * i).flatten()]
+            # if deltaB is not None:
+            #     cons += [(A_ineq @ x[0:3, i])<= (b_ineq + np.array(deltaB) * i).flatten()]
 
         u_max = np.array([29.4, 1.4715, 1.4715, 0.0196])
         u_min = np.array([-9.8, -1.4715, -1.4715, -0.0196])
         if dynamic==True:
-            cons += [u <= np.array([u_max]).T, u >= np.array([u_min]).T]
-            cons += [x[6:9,:] <= 2*np.ones((3,1)), x[6:9,:] >= -2*np.ones((3,1))]
+            cons += [u <= np.array([u_max]).T, u >= np.array([u_min]).T]                            # Input limit
+            cons += [x[6:9,:] <= 2*np.ones((3,1)), x[6:9,:] >= -2*np.ones((3,1))]                   # Speed limit
+            cons += [x[3:5,:] <= 0.5*np.pi*np.ones((2,1)), x[3:5,:] >= -0.5*np.pi*np.ones((2,1))]   # Pitch and roll limit
 
-        if deltaB is None:
-            cons += [A_ineq @ x[0:3, :] <= b_ineq]
+        # if deltaB is None:
+        #     cons += [A_ineq @ x[0:3, :] <= b_ineq]
 
         prob = cp.Problem(obj, cons)
         prob.solve(verbose=False)
 
-        # print("optimal value", prob.value)
-        # print(u.value)
-        # print(x.value)
-
         point_id = []
         line_id = []
-        if render == True:
-            pred_x = np.hstack((x0[0:3].reshape((3, 1)), x.value[0:3, :]))
-            for i in range(N):
-                point_id.append(p.addUserDebugPoints([pred_x[:, i + 1].tolist()], [[0, 0, 1]], 5))
-                line_id.append(p.addUserDebugLine(pred_x[:, i].tolist(), pred_x[:, i + 1].tolist(), [0, 1, 0], 3))
-        #print(u.value[:,0])
-        return u.value[:,0], x.value, point_id, line_id
+        # if render == True:
+        #     pred_x = np.hstack((x0[0:3].reshape((3, 1)), x.value[0:3, :]))
+        #     for i in range(N):
+        #         point_id.append(p.addUserDebugPoints([pred_x[:, i + 1].tolist()], [[0, 0, 1]], 5))
+        #         line_id.append(p.addUserDebugLine(pred_x[:, i].tolist(), pred_x[:, i + 1].tolist(), [0, 1, 0], 3))
+        return u.value[:, 0], x.value, point_id, line_id
 
-    def step(self, x, x_ref, cont_type="LQR", info_dict=None, dynamic=False):
+    def step(self, x, x_ref, cont_type="LQR", info_dict=None, dynamic=True):
         # discrete step
         u = 0
         if cont_type == "LQR":
             u = self.K @ (x_ref - x)
+            # Constrainted LQR
+            u_max = np.array([29.4, 1.4715, 1.4715, 0.0196])
+            u_min = np.array([-9.8, -1.4715, -1.4715, -0.0196])
+            u = np.clip(u, u_min, u_max)    # saturation function
         elif cont_type == "MPC":
-            A_ineq, b_ineq = info_dict["A"], info_dict["b"]
-            u, _, point_id, line_id = self.mpc(x, x_ref, A_ineq, b_ineq, Q=np.diag([1,1,1,0,0,0,0,0,0,0,0,0]), R=np.eye(4), N=10, render=True, deltaB=info_dict["deltaB"],dynamic=dynamic)
+            #A_ineq, b_ineq = info_dict["A"], info_dict["b"]
+            A_ineq, b_ineq = 0, 0
+            #Q_mpc = np.diag([1,1,1,0,0,0,0,0,0,0,0,0])
+            Q_mpc = np.eye(12) # same with LQR for comparison
+            R_mpc = np.eye(4)
+            N_mpc = 10
+            u, _, point_id, line_id = self.mpc(x, x_ref, A_ineq, b_ineq, Q=Q_mpc, R=R_mpc, N=N_mpc, 
+                                               render=True, deltaB=None, dynamic=dynamic)
         x_next = self.dsys.A @ x + self.dsys.B @ u
-        return x_next,point_id, line_id
+        return x_next, u
 
 if __name__ == "__main__":
     model = Quadrotor()
     print("A:", model.A, "\nB:", model.B, "\nC:", model.C, "\nD:", model.D)
+
+    # Check controlability
+    if np.linalg.matrix_rank(ctrl.ctrb(model.A, model.B)) == model.n_states:
+        print("System is controllable")
+    else:
+        print("System is not controllable")
+
+    # Check observability
+    if np.linalg.matrix_rank(ctrl.obsv(model.A, model.C)) == model.n_states:
+        print("System is observable")
+    else:
+        print("System is not observable")
