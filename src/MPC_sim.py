@@ -38,9 +38,6 @@ x_ref = trajectory_generation.hover_traj(time_steps)  # reference trajectory (st
 # x_max = np.array([np.inf, np.inf, np.inf, np.pi/2, np.pi/2, np.inf, 2, 2, 2, np.inf, np.inf, np.inf])
 # x_min = np.array([-np.inf, -np.inf, -np.inf, -np.pi/2, -np.pi/2, -np.inf, -2, -2, -2, -np.inf, -np.inf, -np.inf])
 
-# Compute the Xf: invariant constraint admissible set
-
-
 # Simulation
 for k in range(time_steps-1):
     x_current = x_bag[:, k]
