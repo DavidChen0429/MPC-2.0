@@ -15,7 +15,7 @@ time = np.linspace(0, t_final, time_steps)
 
 # initialize state and input arrays
 x_bag, u_bag = drone_model.get_ss_bag_vectors(time_steps) #vnp.zeros((self.n_states, N))
-x0 = np.array([1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+x0 = np.array([5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
 u0 = np.array([0, 0, 0, 0])
 x_bag[:, 0] = x0
 u_bag[:, 0] = u0

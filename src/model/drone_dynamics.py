@@ -129,10 +129,9 @@ class Quadrotor:
         u_min = np.array([-10, -1.4715, -1.4715, -0.0196])
         if dynamic==True:
             cons += [u <= np.array([u_max]).T, u >= np.array([u_min]).T]                            # Input limit
-            #cons += [x[:3,:] <= 100*np.ones((3,1)), x[:3,:] >= 100*np.ones((3,1))]                 # Position limit
             cons += [x[3:5,:] <= 0.5*np.pi*np.ones((2,1)), x[3:5,:] >= -0.5*np.pi*np.ones((2,1))]   # Pitch and roll limit
             cons += [x[6:9,:] <= 2*np.ones((3,1)), x[6:9,:] >= -2*np.ones((3,1))]                   # Speed limit
-            #cons += [x[9:12,:] <= 2*np.pi*np.ones((3,1)), x[9:12,:] >= -2*np.pi*np.ones((3,1))]     # Angular speed limit
+            cons += [x[9:12,:] <= 3*np.pi*np.ones((3,1)), x[9:12,:] >= -3*np.pi*np.ones((3,1))]     # Angular speed limit
 
         # if deltaB is None:
         #     cons += [A_ineq @ x[0:3, :] <= b_ineq]
@@ -147,6 +146,7 @@ class Quadrotor:
         #     for i in range(N):
         #         point_id.append(p.addUserDebugPoints([pred_x[:, i + 1].tolist()], [[0, 0, 1]], 5))
         #         line_id.append(p.addUserDebugLine(pred_x[:, i].tolist(), pred_x[:, i + 1].tolist(), [0, 1, 0], 3))
+        #print(u.value)
         return u.value[:, 0], x.value, point_id, line_id
 
     def step(self, x, x_ref, cont_type="LQR", info_dict=None, dynamic=True):
