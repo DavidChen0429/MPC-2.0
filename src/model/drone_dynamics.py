@@ -3,6 +3,7 @@ import numpy as np
 import control as ctrl
 import cvxpy as cp
 from scipy import linalg as la
+import matplotlib.pyplot as plt
 
 class Quadrotor:
     def __init__(self, parms):
@@ -113,7 +114,9 @@ class Quadrotor:
         # B matrix becomes [B; 0]
         # C matrix becomes [C Cd]
         self.nd = len(d)
-        A_aug = np.vstack([np.hstack([self.dsys.A, Bd]), np.hstack([np.zeros((1, self.n_states)), np.eye(1)*0.9])]) # 13x13
+        Bd = np.array([1,0,0,0,0,0,0,0,0,0,0,0]).reshape((12, 1)) # disturbance on x
+        Cd = np.array([0,0,0,0,0,0,0,0,0,0,0,0]).reshape((12, 1)) # measure only x
+        A_aug = np.vstack([np.hstack([self.dsys.A, Bd]), np.hstack([np.zeros((1, self.n_states)), np.eye(1)*0.99])]) # 13x13
         B_aug = np.vstack([self.dsys.B, np.zeros((1, self.n_inputs))])  # 13x4
         C_aug = np.hstack([self.dsys.C, Cd])    # 12x13
         D_aug = np.zeros((self.n_states, self.n_inputs))    # 12x4
@@ -142,14 +145,20 @@ class Quadrotor:
         Q_aug[:12, :12] = parms["Q"]
         R_aug = parms["R"]
         R_Kalman = np.eye(12)
-        K_aug, P_aug, _ = ctrl.dlqr(self.dAugsys.A, self.dAugsys.B, Q_aug, R_aug) # 4*13, 13*13
+        K_aug, _, _ = ctrl.dlqr(self.dAugsys.A, self.dAugsys.B, Q_aug, R_aug) # 4*13, 13*13
+
+
         X_kalman, P_kalman, _ = ctrl.dare(self.dAugsys.A.T, self.dAugsys.C.T, Q_aug, R_Kalman)  # 13*13, 13*1
         L_kalman =  self.dAugsys.A @ X_kalman @ self.dAugsys.C.T @ la.inv(self.dAugsys.C @ X_kalman @ self.dAugsys.C.T + R_Kalman) # 13*12
         K_aug, P_aug, _ = ctrl.dlqr(self.dAugsys.A, self.dAugsys.B, Q_aug, R_aug) # 4*13
         CL_poles = np.linalg.eigvals(self.dAugsys.A - self.dAugsys.B @ K_aug)
-        Obe_poles = np.linalg.eigvals(self.dAugsys.A - L_kalman @ self.dAugsys.C)
+        Obe_poles = CL_poles
+        Obe_poles[-1] = 1
+        L2 = ctrl.place(self.dAugsys.A.T, self.dAugsys.C.T, Obe_poles).T
+        #Obe_poles = np.linalg.eigvals(self.dAugsys.A - L_kalman @ self.dAugsys.C)
+        print(Obe_poles, np.linalg.eigvals(self.dAugsys.A - L2 @ self.dAugsys.C))
 
-        return L_kalman
+        return L2, K_aug
 
         
 
@@ -226,9 +235,59 @@ if __name__ == "__main__":
     model = Quadrotor(parms)
 
     # Augmented system
-    d = [1]
+    d = [0.1]
     Bd = np.array([1,0,0,0,0,0,0,0,0,0,0,0]).reshape((12, 1)) # disturbance on x
-    Cd = np.array([0,0,0,0,0,0,0,0,0,0,0,0]).reshape(12, 1) # measure only x
+    Cd = np.array([0,0,0,0,0,0,0,0,0,0,0,0]).reshape((12, 1)) # measure only x
     A_aug, B_aug, C_aug, D_aug = model.augment_sys_disturbance(d, Bd, Cd)
 
-    print(A_aug, B_aug, C_aug, D_aug)
+    # Luenberger Observer
+    L, Klqr_aug = model.Luenberger_observer(parms)
+
+    dt = 0.1 
+    t_final = 20.0 # seconds
+    time_steps = int(t_final / dt)
+    time = np.linspace(0, t_final, time_steps)
+    
+    x_bag, u_bag = model.get_ss_bag_vectors(time_steps) #vnp.zeros((self.n_states, N))
+    x_aug_bag = np.vstack([x_bag, np.zeros((1, time_steps))])
+    x0_aug = np.array([5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1])
+    x0_hat = np.array([5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+    u0 = np.array([0, 0, 0, 0])
+    x_aug_bag[:, 0] = x0_aug
+    u_bag[:, 0] = u0
+    x_aug_hat = np.zeros((13, time_steps))
+    x_aug_hat[:, 0] = x0_hat
+    
+    x_x_ref = np.zeros(time_steps)
+    x_y_ref = np.zeros(time_steps)
+    x_z_ref = np.ones(time_steps) * 10
+    x_ref = np.vstack((x_x_ref, x_y_ref, x_z_ref, np.zeros((9, time_steps))))
+    x_ref_aug = np.vstack([x_ref, d*np.ones((1, time_steps))])
+
+    for k in range(time_steps-1):
+        x_aug_current = x_aug_bag[:, k]
+        x_ref_current = x_ref_aug[:, k]
+        x_hat_current = x_aug_hat[:, k]
+        u = Klqr_aug @ (x_ref_current - x_aug_current)
+        x_next = model.dAugsys.A @ x_aug_current + model.dAugsys.B @ u
+        y = model.dAugsys.C @ x_aug_current
+
+        y_hat = model.dAugsys.C @ x_hat_current
+        error = y - y_hat
+        x_hat = model.dAugsys.A @ x_hat_current + model.dAugsys.B @ u + L @ error
+
+        x_aug_hat[:, k+1] = x_hat
+        x_aug_bag[:, k+1] = x_next
+        u_bag[:, k+1] = u
+
+    plt.figure()
+    #plt.step(time, x_aug_bag[0, :], '#1f77b4', label="x_x")
+    #plt.step(time, x_aug_hat[0,:], '#1f77b4', linestyle='--', label="x_x hat")
+    plt.step(time, x_aug_bag[1, :], '#ff7f0e', label="x_y")
+    plt.step(time, x_aug_hat[1,:], '#ff7f0e', linestyle='--', label="x_y hat")
+    #plt.step(time, x_aug_bag[2, :], '#2ca02c', label="x_z")
+    #plt.step(time, x_aug_hat[2,:], '#2ca02c', linestyle='--', label="x_z hat")
+    plt.xlabel("Time [s]")
+    plt.title("Constrainted LQR Hovering Simulation")
+    plt.legend()
+    plt.show()
