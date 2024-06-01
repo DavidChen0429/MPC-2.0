@@ -137,8 +137,7 @@ class Quadrotor:
     
     def Luenberger_observer(self):
     # Build Luenberger Observer
-    
-    print(np.linalg.eigvals(self.dAugsys.A))   # Poles for original systems
+        print(np.linalg.eigvals(self.dAugsys.A))   # Poles for original systems
 
 
     def mpc(self, x0, x_goal, Q=np.eye(12), R=np.eye(4), N=10, Qf=np.eye(12), dynamic=False):
