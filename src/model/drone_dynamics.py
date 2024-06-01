@@ -7,7 +7,7 @@ import cvxpy as cp
 
 
 class Quadrotor:
-    def __init__(self):
+    def __init__(self, parms):
         self.n_states = 12 # x, y, z, phi, theta, psi, derivatives of before
         self.n_inputs = 4 # F, Tx, Ty, Tz
         self.x = ca.SX.sym('x', self.n_states)  # State variables
@@ -30,7 +30,7 @@ class Quadrotor:
         x_operating = np.zeros((12, 1))
         u_operating = np.array([10, 0, 0, 0]).reshape((-1, 1))  # hovering (mg 0 0 0)
         self.A, self.B, self.C, self.D = self.linearize(x_operating, u_operating)
-        self.K, self.P = self.make_dlqr_controller()
+        self.K, self.P = self.make_dlqr_controller(parms=parms)
 
     def build_x_dot(self):
         self.x_dot = ca.vertcat(self.x[1], -self.x[0] + self.u)
@@ -91,17 +91,15 @@ class Quadrotor:
         x_next = self.dynamics(x, u)
         return x_next
 
-    def make_dlqr_controller(self):
+    def make_dlqr_controller(self, parms):
         x_operating = np.zeros((12, 1))
         u_operating = np.array([10, 0, 0, 0]).reshape((-1, 1))
         A, B, C, D = self.linearize(x_operating, u_operating)
-        Q = np.eye(12)
-        R = np.eye(4)
         sys_continuous = ctrl.ss(A, B, C, D)
         self.csys = sys_continuous
         sys_discrete = ctrl.c2d(sys_continuous, self.dt, method='zoh')
         self.dsys = sys_discrete
-        K, P, _ = ctrl.dlqr(self.dsys.A, self.dsys.B, Q, R)
+        K, P, _ = ctrl.dlqr(self.dsys.A, self.dsys.B, parms["Q"], parms["R"])
         return K, P
 
     def get_ss_bag_vectors(self, N):
