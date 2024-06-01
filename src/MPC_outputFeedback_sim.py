@@ -15,6 +15,6 @@ drone_model = drone_dynamics.Quadrotor(parms)
 # Augment the system with a constant disturbance term d
 d = [1]
 Bd = np.array([1,0,0,0,0,0,0,0,0,0,0,0]).reshape((12, 1)) # disturbance on x
-Cd = np.array([1,0,0,0,0,0,0,0,0,0,0,0]).reshape(12, 1) # measure only x
+Cd = np.array([0,0,0,0,0,0,0,0,0,0,0,0]).reshape(12, 1) # measure only x
 A_aug, B_aug, C_aug, D_aug = drone_model.augment_sys_disturbance(d, Bd, Cd)
-drone_model.Luenberger_observer()
+drone_model.Luenberger_observer(parms)
