@@ -38,8 +38,8 @@ for k in range(time_steps-1):
     x_bag_nl[:, k+1] = x_next
     u_bag_nl[:, k+1] = u
 
-plt.plot(time, x_bag[2, :], label="linear")
-plt.plot(time, x_bag_nl[2, :], label="non-linear")
-plt.plot(time, x_ref[2, :], label="reference")
+plt.step(time, x_bag[2, :], label="linear")
+plt.step(time, x_bag_nl[2, :], label="non-linear")
+plt.step(time, x_ref[2, :], label="reference")
 plt.legend()
 plt.show()

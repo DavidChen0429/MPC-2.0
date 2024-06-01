@@ -138,11 +138,11 @@ class Quadrotor:
         print(np.linalg.eigvals(self.dAugsys.A))   # Poles for original systems
 
 
-    def mpc(self, x0, x_goal, Q=np.eye(12), R=np.eye(4), N=10, Qf=np.eye(12), dynamic=False):
+    def mpc(self, x0, x_ref, u_ref, Q=np.eye(12), R=np.eye(4), N=10, Qf=np.eye(12), dynamic=False):
         x = cp.Variable((12, N))
         u = cp.Variable((4, N))
-        cost = sum(cp.quad_form(x[:, i] - x_goal.T, Q) + cp.quad_form(u[:, i], R) for i in range(N))  # stage cost
-        cost += cp.quad_form(x[:, N-1] - x_goal.T, Qf)  # terminal cost
+        cost = sum(cp.quad_form(x[:, i] - x_ref.T, Q) + cp.quad_form(u[:, i] - u_ref, R) for i in range(N))  # stage cost
+        cost += cp.quad_form(x[:, N-1] - x_ref.T, Qf)  # terminal cost
         obj = cp.Minimize(cost)
 
         cons = [x[:, 0] == x0]
@@ -162,7 +162,18 @@ class Quadrotor:
         prob.solve(verbose=False)
         return u.value[:, 0], x.value
 
-    def step(self, x, x_ref, cont_type="LQR", sim_system="linear", parms=None):
+    def ots(self, y_ref, parms):
+        x = cp.Variable(self.n_states)
+        u = cp.Variable(self.n_inputs)
+        obj = cp.Minimize(cp.quad_form(x, parms["Q"]) + cp.quad_form(u, parms["R"]))
+        const = [(np.eye(self.n_states) - self.dsys.A) @ x == self.dsys.B @ u]
+        const += [np.hstack([np.eye(3), np.zeros((3, 9))]) @ x == y_ref]
+        prob = cp.Problem(obj, const)
+        prob.solve(verbose=False)
+        x_ref, u_ref = x.value, u.value
+        return x_ref, u_ref
+
+    def step(self, x, x_ref, u_ref, cont_type="LQR", sim_system="linear", parms=None):
         # discrete step
         if cont_type == "LQR":
             u = self.K @ (x_ref - x)
@@ -173,7 +184,8 @@ class Quadrotor:
             u = np.clip(u, u_min, u_max)  # saturation function
         elif cont_type == "MPC":
             try:
-                u, _ = self.mpc(x, x_ref, Q=parms["Q"], R=parms["R"], N=parms["N"], Qf=parms["Qf"], dynamic=parms["dynamic"])
+                u_ref = np.zeros(4)
+                u, _ = self.mpc(x, x_ref, u_ref, Q=parms["Q"], R=parms["R"], N=parms["N"], Qf=parms["Qf"], dynamic=parms["dynamic"])
             except:
                 u = np.zeros(4)
         else:
