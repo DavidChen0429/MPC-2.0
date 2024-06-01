@@ -1,7 +1,4 @@
 import numpy as np
-#from .mistgen.minimum_snap import mist_generator
-from mpl_toolkits.mplot3d import Axes3D
-import matplotlib.pyplot as plt
 
 
 def hover_traj(N):
