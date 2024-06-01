@@ -109,6 +109,36 @@ class Quadrotor:
         x_bag = np.zeros((self.n_states, N))
         u_bag = np.zeros((self.n_inputs, N))
         return x_bag, u_bag
+    
+    def augment_sys_disturbance(self, d, Bd, Cd):
+        # Augment the system with a constant disturbance term d
+        # State becomes [x, d]
+        # A matrix becomes [A Bd; 0 1]
+        # B matrix becomes [B; 0]
+        # C matrix becomes [C Cd]
+        self.nd = len(d)
+        A_aug = np.vstack([np.hstack([self.dsys.A, Bd]), np.hstack([np.zeros((1, self.n_states)), np.eye(1)])]) # 13x13
+        B_aug = np.vstack([self.dsys.B, np.zeros((1, self.n_inputs))])  # 13x4
+        C_aug = np.hstack([self.dsys.C, Cd])    # 12x13
+        D_aug = np.zeros((self.n_states, self.n_inputs))    # 12x4
+        print(A_aug.shape, B_aug.shape, C_aug.shape, D_aug.shape)
+        sysAug_continuous = ctrl.ss(A_aug, B_aug, C_aug, D_aug)
+        sysAug_discrete = ctrl.c2d(sysAug_continuous, self.dt, method='zoh')
+        self.dAugsys = sysAug_discrete
+
+        # Check conditions (Observability Original System and Augmented System)
+        # Construct test matrix [I-A -Bd; C Cd]
+        test_matrix = np.vstack([np.hstack([np.eye(self.n_states) - self.dsys.A, -Bd]), np.hstack([self.dsys.C, Cd])])
+        if (np.linalg.matrix_rank(ctrl.obsv(model.A, model.C)) == model.n_states) and  (np.linalg.matrix_rank(test_matrix) == self.n_states + self.nd):
+            print("Condition Fullfilled: System is observable and Augmented System is observable")
+        else:
+            print("You'er Fucked")
+        return A_aug, B_aug, C_aug, D_aug
+    
+    def Luenberger_observer(self):
+    # Build Luenberger Observer
+        print(np.linalg.eigvals(model.dAugsys.A))   # Poles for original systems
+
 
     def mpc(self, x0, x_goal, Q=np.eye(12), R=np.eye(4), N=10, Qf=np.eye(12), dynamic=False):
         x = cp.Variable((12, N))
@@ -177,5 +207,18 @@ if __name__ == "__main__":
     else:
         print("System is not observable")
 
+    # Check discrete system poles
+    poles = np.linalg.eigvals(model.dsys.A)
+    print("Poles of discrete system:", poles)
 
-    
+    # # Luenberger observer
+    # L = ctrl.place(model.A.T, model.C.T, poles).T
+    # print("L:", L)
+    # print("Eigenvalues of A-LC:", np.linalg.eigvals(model.A - L @ model.C))
+
+    # Augmented system
+    d = [1]
+    Bd = np.array([1,0,0,0,0,0,0,0,0,0,0,0]).reshape((12, 1)) # disturbance on x
+    Cd = np.array([1,0,0,0,0,0,0,0,0,0,0,0]).reshape(12, 1) # measure only x
+    A_aug, B_aug, C_aug, D_aug = model.augment_sys_disturbance(d, Bd, Cd)
+    model.Luenberger_observer()
