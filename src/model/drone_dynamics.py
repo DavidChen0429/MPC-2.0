@@ -2,6 +2,7 @@ import casadi as ca
 import numpy as np
 import control as ctrl
 import cvxpy as cp
+from scipy import linalg as la
 
 class Quadrotor:
     def __init__(self, parms):
@@ -140,11 +141,15 @@ class Quadrotor:
         Q_aug = np.eye(13)
         Q_aug[:12, :12] = parms["Q"]
         R_aug = parms["R"]
+        R_Kalman = np.eye(12)
+        K_aug, P_aug, _ = ctrl.dlqr(self.dAugsys.A, self.dAugsys.B, Q_aug, R_aug) # 4*13, 13*13
+        X_kalman, P_kalman, _ = ctrl.dare(self.dAugsys.A.T, self.dAugsys.C.T, Q_aug, R_Kalman)  # 13*13, 13*1
+        L_kalman =  self.dAugsys.A @ X_kalman @ self.dAugsys.C.T @ la.inv(self.dAugsys.C @ X_kalman @ self.dAugsys.C.T + R_Kalman) # 13*12
         K_aug, P_aug, _ = ctrl.dlqr(self.dAugsys.A, self.dAugsys.B, Q_aug, R_aug) # 4*13
         CL_poles = np.linalg.eigvals(self.dAugsys.A - self.dAugsys.B @ K_aug)
-        Observer_poles = CL_poles
-        L = ctrl.place(self.dAugsys.A.T, self.dAugsys.C.T, Observer_poles).T # 13*12
-        print(CL_poles, '\n' ,np.linalg.eigvals(self.dAugsys.A - L @ self.dAugsys.C), '\n', Observer_poles)
+        Obe_poles = np.linalg.eigvals(self.dAugsys.A - L_kalman @ self.dAugsys.C)
+
+        return L_kalman
 
         
 
@@ -225,3 +230,5 @@ if __name__ == "__main__":
     Bd = np.array([1,0,0,0,0,0,0,0,0,0,0,0]).reshape((12, 1)) # disturbance on x
     Cd = np.array([0,0,0,0,0,0,0,0,0,0,0,0]).reshape(12, 1) # measure only x
     A_aug, B_aug, C_aug, D_aug = model.augment_sys_disturbance(d, Bd, Cd)
+
+    print(A_aug, B_aug, C_aug, D_aug)
