@@ -41,7 +41,7 @@ class Quadrotor:
         self.u = ca.SX.sym("u", self.n_inputs)
 
         m = 1  # kg
-        g = 9.80665  # m/s^2
+        g = 10  # m/s^2
         Ix, Iy, Iz = 0.11, 0.11, 0.04  # kg m^2
         l = 0.2  # m (this drops out when controlling via torques)
 
@@ -160,7 +160,6 @@ class Quadrotor:
 
         prob = cp.Problem(obj, cons)
         prob.solve(verbose=False)
-
         return u.value[:, 0], x.value
 
     def step(self, x, x_ref, cont_type="LQR", sim_system="linear", parms=None):
@@ -173,14 +172,18 @@ class Quadrotor:
             u_min = np.array([-10, -1.4715, -1.4715, -0.0196])
             u = np.clip(u, u_min, u_max)  # saturation function
         elif cont_type == "MPC":
-            u, _ = self.mpc(x, x_ref, Q=parms["Q"], R=parms["R"], N=parms["N"], Qf=parms["Qf"], dynamic=parms["dynamic"])
+            try:
+                u, _ = self.mpc(x, x_ref, Q=parms["Q"], R=parms["R"], N=parms["N"], Qf=parms["Qf"], dynamic=parms["dynamic"])
+            except:
+                u = np.zeros(4)
         else:
             raise ValueError("Specified controller type not known.")
 
         if sim_system == "linear":
             x_next = self.dsys.A @ x + self.dsys.B @ u
         elif sim_system == "non-linear":
-            raise NotImplementedError
+            u[0] += 10
+            x_next = np.array(self.compute_next_state(x, u).full()).squeeze()
         else:
             raise ValueError("Sim system argument must be linear or non-linear.")
         return x_next, u

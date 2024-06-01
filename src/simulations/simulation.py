@@ -1,5 +1,5 @@
-from model import drone_dynamics
-from planner import trajectory_generation
+from src.model import drone_dynamics
+from src.planner import trajectory_generation
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -9,11 +9,10 @@ dt = 0.1
 t_final = 20.0  # seconds
 time_steps = int(t_final / dt)
 time = np.linspace(0, t_final, time_steps)
-drone_model = drone_dynamics.Quadrotor()
 
 Q = np.eye(12)
-Q[1, 1] = 0.
 parms = {"Q": Q, "R": np.eye(4), "N": 10, "Qf": Q, "dynamic": True}
+drone_model = drone_dynamics.Quadrotor(parms)
 
 # initialize state and input arrays
 x_bag, u_bag = drone_model.get_ss_bag_vectors(time_steps) #vnp.zeros((self.n_states, N))
