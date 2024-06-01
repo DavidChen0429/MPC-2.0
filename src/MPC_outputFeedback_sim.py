@@ -16,4 +16,4 @@ d = [1]
 Bd = np.array([1,0,0,0,0,0,0,0,0,0,0,0]).reshape((12, 1)) # disturbance on x
 Cd = np.array([1,0,0,0,0,0,0,0,0,0,0,0]).reshape(12, 1) # measure only x
 A_aug, B_aug, C_aug, D_aug = drone_model.augment_sys_disturbance(d, Bd, Cd)
-print("A_aug:", A_aug, "\nB_aug:", B_aug, "\nC_aug:", C_aug, "\nD_aug:", D_aug)
+drone_model.Luenberger_observer()
