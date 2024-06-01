@@ -1,7 +1,6 @@
 # Simulate the LQR controller for hovering the drone at a single point
-from Model import drone_dynamics
-from Planner import trajectory_generation
-#from Planner import SafeFlightPolytope
+from model import drone_dynamics
+from planner import trajectory_generation
 import matplotlib.pyplot as plt
 import numpy as np
 

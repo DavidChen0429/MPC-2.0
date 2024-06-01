@@ -141,72 +141,60 @@ class Quadrotor:
     print(np.linalg.eigvals(self.dAugsys.A))   # Poles for original systems
 
 
-    def mpc(self, x0, x_goal, A_ineq, b_ineq, Q=np.eye(12), R=np.eye(4), N=10, render=True, deltaB=None, dynamic=False):
+    def mpc(self, x0, x_goal, Q=np.eye(12), R=np.eye(4), N=10, Qf=np.eye(12), dynamic=False):
         x = cp.Variable((12, N))
         u = cp.Variable((4, N))
-        cost = sum(cp.quad_form(x[:, i] - x_goal.T, Q) + cp.quad_form(u[:, i], R) for i in range(N)) # stage cost
-        #cost += cp.quad_form(x[:3,N-1] - x_goal[:3], np.eye(3)) # terminal cost
-        cost += cp.quad_form(x[:, N-1] - x_goal.T, self.P) # terminal cost
+        cost = sum(cp.quad_form(x[:, i] - x_goal.T, Q) + cp.quad_form(u[:, i], R) for i in range(N))  # stage cost
+        cost += cp.quad_form(x[:, N-1] - x_goal.T, Qf)  # terminal cost
         obj = cp.Minimize(cost)
 
         cons = [x[:, 0] == x0]
         for i in range(1, N):
             cons += [x[:, i] == self.dsys.A @ x[:, i-1] + self.dsys.B @ u[:, i-1]]
 
-            # if deltaB is not None:
-            #     cons += [(A_ineq @ x[0:3, i])<= (b_ineq + np.array(deltaB) * i).flatten()]
-
         u_max = np.array([30, 1.4715, 1.4715, 0.0196])
         u_min = np.array([-10, -1.4715, -1.4715, -0.0196])
+
         if dynamic==True:
             cons += [u <= np.array([u_max]).T, u >= np.array([u_min]).T]                            # Input limit
-            cons += [x[3:5,:] <= 0.5*np.pi*np.ones((2,1)), x[3:5,:] >= -0.5*np.pi*np.ones((2,1))]   # Pitch and roll limit
-            cons += [x[6:9,:] <= 2*np.ones((3,1)), x[6:9,:] >= -2*np.ones((3,1))]                   # Speed limit
-            cons += [x[9:12,:] <= 3*np.pi*np.ones((3,1)), x[9:12,:] >= -3*np.pi*np.ones((3,1))]     # Angular speed limit
-
-        # if deltaB is None:
-        #     cons += [A_ineq @ x[0:3, :] <= b_ineq]
+            cons += [x[3:5, :] <= 0.5*np.pi*np.ones((2,1)), x[3:5,:] >= -0.5*np.pi*np.ones((2, 1))]   # Pitch and roll limit
+            cons += [x[6:9, :] <= 2*np.ones((3,1)), x[6:9,:] >= -2*np.ones((3, 1))]                   # Speed limit
+            cons += [x[9:12, :] <= 3*np.pi*np.ones((3,1)), x[9:12,:] >= -3*np.pi*np.ones((3, 1))]     # Angular speed limit
 
         prob = cp.Problem(obj, cons)
         prob.solve(verbose=False)
 
-        point_id = []
-        line_id = []
-        # if render == True:
-        #     pred_x = np.hstack((x0[0:3].reshape((3, 1)), x.value[0:3, :]))
-        #     for i in range(N):
-        #         point_id.append(p.addUserDebugPoints([pred_x[:, i + 1].tolist()], [[0, 0, 1]], 5))
-        #         line_id.append(p.addUserDebugLine(pred_x[:, i].tolist(), pred_x[:, i + 1].tolist(), [0, 1, 0], 3))
-        #print(u.value)
-        return u.value[:, 0], x.value, point_id, line_id
+        return u.value[:, 0], x.value
 
-    def step(self, x, x_ref, cont_type="LQR", info_dict=None, dynamic=True):
+    def step(self, x, x_ref, cont_type="LQR", sim_system="linear", parms=None):
         # discrete step
-        u = 0
         if cont_type == "LQR":
             u = self.K @ (x_ref - x)
-            # Constrainted LQR
+        elif cont_type == "c-LQR":  # constrained LQR
+            u = self.K @ (x_ref - x)
             u_max = np.array([30, 1.4715, 1.4715, 0.0196])
             u_min = np.array([-10, -1.4715, -1.4715, -0.0196])
-            u = np.clip(u, u_min, u_max)    # saturation function
+            u = np.clip(u, u_min, u_max)  # saturation function
         elif cont_type == "MPC":
-            #A_ineq, b_ineq = info_dict["A"], info_dict["b"]
-            A_ineq, b_ineq = 0, 0
-            #Q_mpc = np.diag([1,1,1,0,0,0,0,0,0,0,0,0])
-            Q_mpc = np.eye(12) # same with LQR for comparison
-            R_mpc = np.eye(4)
-            N_mpc = 10
-            u, _, point_id, line_id = self.mpc(x, x_ref, A_ineq, b_ineq, Q=Q_mpc, R=R_mpc, N=N_mpc, 
-                                               render=True, deltaB=None, dynamic=dynamic)
-        x_next = self.dsys.A @ x + self.dsys.B @ u
+            u, _ = self.mpc(x, x_ref, Q=parms["Q"], R=parms["R"], N=parms["N"], Qf=parms["Qf"], dynamic=parms["dynamic"])
+        else:
+            raise ValueError("Specified controller type not known.")
+
+        if sim_system == "linear":
+            x_next = self.dsys.A @ x + self.dsys.B @ u
+        elif sim_system == "non-linear":
+            raise NotImplementedError
+        else:
+            raise ValueError("Sim system argument must be linear or non-linear.")
         return x_next, u
+
 
 if __name__ == "__main__":
     model = Quadrotor()
     print("A:", model.A, "\nB:", model.B, "\nC:", model.C, "\nD:", model.D)
     print("K:", model.K.shape)
     print("P:", model.P.shape)
-    print("Eigenvalue of P:", np.linalg.eigvals(model.P))   # unique positive semi-definite solution of the Riccati equation
+    print("Eigenvalue of P:", np.linalg.eigvals(model.P))  # unique positive semi-definite solution of the Riccati equation
 
     # Check controlability
     if np.linalg.matrix_rank(ctrl.ctrb(model.A, model.B)) == model.n_states:
