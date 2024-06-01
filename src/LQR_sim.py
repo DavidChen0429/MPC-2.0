@@ -25,7 +25,7 @@ sys_discrete = ctrl.c2d(sys_continuous, dt, method='zoh')
 lqr_K, _, _ = ctrl.dlqr(sys_discrete.A, sys_discrete.B, Q, R)
 
 # initialize state and input arrays
-x_bag, u_bag = drone_model.get_ss_bag_vectors(time_steps) #vnp.zeros((self.n_states, N))
+x_bag, u_bag = drone_model.get_ss_bag_vectors(time_steps) # np.zeros((self.n_states, N))
 x0 = np.array([5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
 u0 = np.array([0, 0, 0, 0])
 x_bag[:, 0] = x0
