@@ -129,7 +129,7 @@ class Quadrotor:
         # Check conditions (Observability Original System and Augmented System)
         # Construct test matrix [I-A -Bd; C Cd]
         test_matrix = np.vstack([np.hstack([np.eye(self.n_states) - self.dsys.A, -Bd]), np.hstack([self.dsys.C, Cd])])
-        if (np.linalg.matrix_rank(ctrl.obsv(model.A, model.C)) == model.n_states) and  (np.linalg.matrix_rank(test_matrix) == self.n_states + self.nd):
+        if (np.linalg.matrix_rank(ctrl.obsv(self.dsys.A, self.dsys.C)) == self.n_states) and  (np.linalg.matrix_rank(test_matrix) == self.n_states + self.nd):
             print("Condition Fullfilled: System is observable and Augmented System is observable")
         else:
             print("You'er Fucked")
@@ -137,7 +137,8 @@ class Quadrotor:
     
     def Luenberger_observer(self):
     # Build Luenberger Observer
-        print(np.linalg.eigvals(model.dAugsys.A))   # Poles for original systems
+    
+    print(np.linalg.eigvals(self.dAugsys.A))   # Poles for original systems
 
 
     def mpc(self, x0, x_goal, A_ineq, b_ineq, Q=np.eye(12), R=np.eye(4), N=10, render=True, deltaB=None, dynamic=False):
