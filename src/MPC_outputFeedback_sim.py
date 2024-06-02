@@ -21,7 +21,7 @@ A_aug, B_aug, C_aug, D_aug = drone_model.augment_sys_disturbance(d, Bd, Cd)
 # Design the observer
 Lobs, Klqr_aug = drone_model.Luenberger_observer(parms)
 
-# Simulate the system with the observer
+# Test the observer
 x_bag, u_bag = drone_model.get_ss_bag_vectors(time_steps) # np.zeros((self.n_states, N))
 x_aug_bag = np.vstack([x_bag, np.zeros((1, time_steps))])
 x_aug_hat = np.zeros((13, time_steps))
