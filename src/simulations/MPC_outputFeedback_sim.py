@@ -1,4 +1,4 @@
-from model import drone_dynamics
+from src.model import drone_dynamics
 import matplotlib.pyplot as plt
 import numpy as np
 
