@@ -2,9 +2,7 @@ import casadi as ca
 import numpy as np
 import control as ctrl
 import cvxpy as cp
-#import pybullet as p
-
-
+import matplotlib.pyplot as plt
 
 class Quadrotor:
     def __init__(self, parms):
@@ -115,28 +113,49 @@ class Quadrotor:
         # B matrix becomes [B; 0]
         # C matrix becomes [C Cd]
         self.nd = len(d)
-        A_aug = np.vstack([np.hstack([self.dsys.A, Bd]), np.hstack([np.zeros((1, self.n_states)), np.eye(1)])]) # 13x13
+        Bd = np.array([1,0,0,0,0,0,0,0,0,0,0,0]).reshape((12, 1)) # disturbance on x
+        Cd = np.array([0,0,0,0,0,0,0,0,0,0,0,0]).reshape((12, 1)) # measure only x
+        A_aug = np.vstack([np.hstack([self.dsys.A, Bd]), np.hstack([np.zeros((1, self.n_states)), np.eye(1)*0.9999])]) # 13x13
         B_aug = np.vstack([self.dsys.B, np.zeros((1, self.n_inputs))])  # 13x4
         C_aug = np.hstack([self.dsys.C, Cd])    # 12x13
         D_aug = np.zeros((self.n_states, self.n_inputs))    # 12x4
-        print(A_aug.shape, B_aug.shape, C_aug.shape, D_aug.shape)
-        sysAug_continuous = ctrl.ss(A_aug, B_aug, C_aug, D_aug)
-        sysAug_discrete = ctrl.c2d(sysAug_continuous, self.dt, method='zoh')
+        sysAug_discrete = ctrl.ss(A_aug, B_aug, C_aug, D_aug)
         self.dAugsys = sysAug_discrete
 
         # Check conditions (Observability Original System and Augmented System)
         # Construct test matrix [I-A -Bd; C Cd]
         test_matrix = np.vstack([np.hstack([np.eye(self.n_states) - self.dsys.A, -Bd]), np.hstack([self.dsys.C, Cd])])
-        if (np.linalg.matrix_rank(ctrl.obsv(self.dsys.A, self.dsys.C)) == self.n_states) and  (np.linalg.matrix_rank(test_matrix) == self.n_states + self.nd):
+        if (np.linalg.matrix_rank(ctrl.obsv(self.dsys.A, self.dsys.C)) == self.n_states) and (np.linalg.matrix_rank(test_matrix) == self.n_states + self.nd):
             print("Condition Fullfilled: System is observable and Augmented System is observable")
         else:
-            print("You'er Fucked")
+            print("ERROR! Not observable")
+        
+        # Check controlability of the augmented system
+        if np.linalg.matrix_rank(ctrl.ctrb(self.dAugsys.A, self.dAugsys.B)) == self.dAugsys.A.shape[0]:
+            print("The augmented system is controllable.")
+        else:
+            print("The augmented system is not controllable.")
+
         return A_aug, B_aug, C_aug, D_aug
     
-    def Luenberger_observer(self):
+    def Luenberger_observer(self, parms):
     # Build Luenberger Observer
-        print(np.linalg.eigvals(self.dAugsys.A))   # Poles for original systems
+        Q_aug = np.eye(13)
+        Q_aug[:12, :12] = parms["Q"]
+        R_aug = parms["R"]
+        Q_Kalman = 10 * np.eye(13)
+        Q_Kalman[0][0] = 1
+        R_Kalman = 0.1 * np.eye(12)
+        K_aug, P_aug, _ = ctrl.dlqr(self.dAugsys.A, self.dAugsys.B, Q_aug, R_aug) # 4*13, 13*13
 
+        # Kalman Gain
+        X_kalman, _, _ = ctrl.dare(self.dAugsys.A.T, self.dAugsys.C.T, Q_Kalman, R_Kalman)  # 13*13, 13*1
+        L_kalman = np.linalg.inv(self.dAugsys.C @ X_kalman @ self.dAugsys.C.T + R_Kalman) @ self.dAugsys.C @ X_kalman @ self.dAugsys.A.T # 12*13
+        L_obs = L_kalman.T   # 13*12
+        CL_poles = np.linalg.eigvals(self.dAugsys.A - self.dAugsys.B @ K_aug)
+        print(CL_poles, '\n\n', np.linalg.eigvals(self.dAugsys.A - L_obs @ self.dAugsys.C))
+
+        return L_obs, K_aug
 
     def mpc(self, x0, x_ref, u_ref, Q=np.eye(12), R=np.eye(4), N=10, Qf=np.eye(12), dynamic=False):
         x = cp.Variable((12, N))
@@ -201,37 +220,31 @@ class Quadrotor:
         return x_next, u
 
 
+def is_stablizable(A, B):
+    n = A.shape[0]
+    eigenvalues = np.linalg.eigvals(A)
+    unstable_eigenvalues = []
+    for lambda_ in eigenvalues:
+        if np.abs(lambda_) >= 1:
+            unstable_eigenvalues.append(lambda_)
+        controllable = True
+        for lambda_ in unstable_eigenvalues:
+            matrix = np.hstack((A - lambda_ * np.eye(n), B))
+            if np.linalg.matrix_rank(matrix) < n:
+                controllable = False
+                break
+        if controllable:
+            print("The pair (A, B) is stabilizable.")
+        else:
+            print("The pair (A, B) is not stabilizable.")
+
 if __name__ == "__main__":
-    model = Quadrotor()
-    print("A:", model.A, "\nB:", model.B, "\nC:", model.C, "\nD:", model.D)
-    print("K:", model.K.shape)
-    print("P:", model.P.shape)
-    print("Eigenvalue of P:", np.linalg.eigvals(model.P))  # unique positive semi-definite solution of the Riccati equation
-
-    # Check controlability
-    if np.linalg.matrix_rank(ctrl.ctrb(model.A, model.B)) == model.n_states:
-        print("System is controllable")
-    else:
-        print("System is not controllable")
-
-    # Check observability
-    if np.linalg.matrix_rank(ctrl.obsv(model.A, model.C)) == model.n_states:
-        print("System is observable")
-    else:
-        print("System is not observable")
-
-    # Check discrete system poles
-    poles = np.linalg.eigvals(model.dsys.A)
-    print("Poles of discrete system:", poles)
-
-    # # Luenberger observer
-    # L = ctrl.place(model.A.T, model.C.T, poles).T
-    # print("L:", L)
-    # print("Eigenvalues of A-LC:", np.linalg.eigvals(model.A - L @ model.C))
+    Q = np.eye(12)
+    parms = {"Q": Q, "R": np.eye(4), "N": 10, "Qf": Q, "dynamic": True}
+    model = Quadrotor(parms)
 
     # Augmented system
-    d = [1]
+    d = [0.1]
     Bd = np.array([1,0,0,0,0,0,0,0,0,0,0,0]).reshape((12, 1)) # disturbance on x
-    Cd = np.array([1,0,0,0,0,0,0,0,0,0,0,0]).reshape(12, 1) # measure only x
+    Cd = np.array([0,0,0,0,0,0,0,0,0,0,0,0]).reshape((12, 1)) # measure only x
     A_aug, B_aug, C_aug, D_aug = model.augment_sys_disturbance(d, Bd, Cd)
-    model.Luenberger_observer()
