@@ -151,13 +151,11 @@ class Quadrotor:
         # Kalman Gain
         X_kalman, _, _ = ctrl.dare(self.dAugsys.A.T, self.dAugsys.C.T, Q_Kalman, R_Kalman)  # 13*13, 13*1
         L_kalman = np.linalg.inv(self.dAugsys.C @ X_kalman @ self.dAugsys.C.T + R_Kalman) @ self.dAugsys.C @ X_kalman @ self.dAugsys.A.T # 12*13
-        L_kalman = L_kalman.T   # 13*12
+        L_obs = L_kalman.T   # 13*12
         CL_poles = np.linalg.eigvals(self.dAugsys.A - self.dAugsys.B @ K_aug)
-        print(CL_poles, '\n\n', np.linalg.eigvals(self.dAugsys.A - L_kalman @ self.dAugsys.C))
+        print(CL_poles, '\n\n', np.linalg.eigvals(self.dAugsys.A - L_obs @ self.dAugsys.C))
 
-        return L_kalman, K_aug
-
-        
+        return L_obs, K_aug
 
     def mpc(self, x0, x_goal, Q=np.eye(12), R=np.eye(4), N=10, Qf=np.eye(12), dynamic=False):
         x = cp.Variable((12, N))
@@ -220,7 +218,6 @@ def is_stablizable(A, B):
             if np.linalg.matrix_rank(matrix) < n:
                 controllable = False
                 break
-
         if controllable:
             print("The pair (A, B) is stabilizable.")
         else:
