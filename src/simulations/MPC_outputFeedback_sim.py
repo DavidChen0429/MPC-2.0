@@ -19,7 +19,7 @@ Cd = np.array([0,0,0,0,0,0,0,0,0,0,0,0]).reshape(12, 1) # measure only x
 A_aug, B_aug, C_aug, D_aug = drone_model.augment_sys_disturbance(d, Bd, Cd)
 
 # Design the observer
-Lobs, Klqr_aug = drone_model.Luenberger_observer(parms)
+Lobs, Klqr_aug = drone_model.luenberger_observer(parms)
 
 # Test the observer
 x_bag, u_bag = drone_model.get_ss_bag_vectors(time_steps) # np.zeros((self.n_states, N))

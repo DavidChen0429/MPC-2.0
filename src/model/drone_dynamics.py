@@ -4,10 +4,12 @@ import control as ctrl
 import cvxpy as cp
 import matplotlib.pyplot as plt
 
+
 class Quadrotor:
     def __init__(self, parms):
-        self.n_states = 12 # x, y, z, phi, theta, psi, derivatives of before
-        self.n_inputs = 4 # F, Tx, Ty, Tz
+        self.n_states = 12  # x, y, z, phi, theta, psi, derivatives of before
+        self.n_inputs = 4  # F, Tx, Ty, Tz
+        self.n_disturbance = 0  # number of disturbance states
         self.x = ca.SX.sym('x', self.n_states)  # State variables
         self.u = ca.SX.sym('u', self.n_inputs)  # Input variable
         self.dt = 0.1
@@ -24,11 +26,11 @@ class Quadrotor:
         self.dsys = 0
         self.csys = 0
 
-        # build dynamics etc
-        x_operating = np.zeros((12, 1))
-        u_operating = np.array([10, 0, 0, 0]).reshape((-1, 1))  # hovering (mg 0 0 0)
-        self.A, self.B, self.C, self.D = self.linearize(x_operating, u_operating)
-        self.K, self.P = self.make_dlqr_controller(parms=parms)
+        # # build dynamics etc
+        # x_operating = np.zeros((12, 1))
+        # u_operating = np.array([10, 0, 0, 0]).reshape((-1, 1))  # hovering (mg 0 0 0)
+        # self.A, self.B, self.C, self.D = self.linearize(x_operating, u_operating)
+        # self.K, self.P = self.make_dlqr_controller(parms=parms)
 
     def build_x_dot(self):
         self.x_dot = ca.vertcat(self.x[1], -self.x[0] + self.u)
@@ -82,7 +84,11 @@ class Quadrotor:
         #make numerical matrices and cast into numpy array
         A = np.array(ca.DM(A))
         B = np.array(ca.DM(B))
-        return A, B, C, D
+        return ctrl.ss(A, B, C, D)
+
+    def discretize(self, sys_con, dt):
+        sys_discrete = ctrl.c2d(sys_con, dt, method='zoh')
+        return sys_discrete
 
     def compute_next_state(self, x, u):
         # x_next = x + self.dt * self.dyn_fun(x, u)
@@ -102,59 +108,56 @@ class Quadrotor:
 
     def get_ss_bag_vectors(self, N):
         """N is the number of simulation steps, thus number of concatinated x vectors"""
-        x_bag = np.zeros((self.n_states, N))
+        x_bag = np.zeros((self.n_states + self.n_disturbance, N))
         u_bag = np.zeros((self.n_inputs, N))
-        return x_bag, u_bag
+        xhat_bag = x_bag.copy()
+        return x_bag, u_bag, xhat_bag
     
-    def augment_sys_disturbance(self, d, Bd, Cd):
+    def augment_system(self, Bd, Cd):
         # Augment the system with a constant disturbance term d
         # State becomes [x, d]
         # A matrix becomes [A Bd; 0 1]
         # B matrix becomes [B; 0]
         # C matrix becomes [C Cd]
-        self.nd = len(d)
-        Bd = np.array([1,0,0,0,0,0,0,0,0,0,0,0]).reshape((12, 1)) # disturbance on x
-        Cd = np.array([0,0,0,0,0,0,0,0,0,0,0,0]).reshape((12, 1)) # measure only x
         A_aug = np.vstack([np.hstack([self.dsys.A, Bd]), np.hstack([np.zeros((1, self.n_states)), np.eye(1)*0.9999])]) # 13x13
         B_aug = np.vstack([self.dsys.B, np.zeros((1, self.n_inputs))])  # 13x4
         C_aug = np.hstack([self.dsys.C, Cd])    # 12x13
         D_aug = np.zeros((self.n_states, self.n_inputs))    # 12x4
-        sysAug_discrete = ctrl.ss(A_aug, B_aug, C_aug, D_aug)
-        self.dAugsys = sysAug_discrete
-
-        # Check conditions (Observability Original System and Augmented System)
-        # Construct test matrix [I-A -Bd; C Cd]
-        test_matrix = np.vstack([np.hstack([np.eye(self.n_states) - self.dsys.A, -Bd]), np.hstack([self.dsys.C, Cd])])
-        if (np.linalg.matrix_rank(ctrl.obsv(self.dsys.A, self.dsys.C)) == self.n_states) and (np.linalg.matrix_rank(test_matrix) == self.n_states + self.nd):
-            print("Condition Fullfilled: System is observable and Augmented System is observable")
-        else:
-            print("ERROR! Not observable")
-        
-        # Check controlability of the augmented system
-        if np.linalg.matrix_rank(ctrl.ctrb(self.dAugsys.A, self.dAugsys.B)) == self.dAugsys.A.shape[0]:
-            print("The augmented system is controllable.")
-        else:
-            print("The augmented system is not controllable.")
+        # sysAug_discrete = ctrl.ss(A_aug, B_aug, C_aug, D_aug)
+        # self.dAugsys = sysAug_discrete
+        #
+        # # Check conditions (Observability Original System and Augmented System)
+        # # Construct test matrix [I-A -Bd; C Cd]
+        # test_matrix = np.vstack([np.hstack([np.eye(self.n_states) - self.dsys.A, -Bd]), np.hstack([self.dsys.C, Cd])])
+        # if (np.linalg.matrix_rank(ctrl.obsv(self.dsys.A, self.dsys.C)) == self.n_states) and (np.linalg.matrix_rank(test_matrix) == self.n_states + self.nd):
+        #     print("Condition Fullfilled: System is observable and Augmented System is observable")
+        # else:
+        #     print("ERROR! Not observable")
+        #
+        # # Check controlability of the augmented system
+        # if np.linalg.matrix_rank(ctrl.ctrb(self.dAugsys.A, self.dAugsys.B)) == self.dAugsys.A.shape[0]:
+        #     print("The augmented system is controllable.")
+        # else:
+        #     print("The augmented system is not controllable.")
 
         return A_aug, B_aug, C_aug, D_aug
     
-    def Luenberger_observer(self, parms):
-    # Build Luenberger Observer
-        Q_aug = np.eye(13)
-        Q_aug[:12, :12] = parms["Q"]
+    def luenberger_observer(self, parms):
+        # make luenberger observer, not that before this the augment_system functions must have been called
+        Q_aug = np.eye(self.n_states + self.n_disturbance)
+        Q_aug[:self.n_states, :self.n_states] = parms["Q"]
         R_aug = parms["R"]
-        Q_Kalman = 10 * np.eye(13)
+        Q_Kalman = 10 * np.eye(self.n_states + self.n_disturbance)
         Q_Kalman[0][0] = 1
-        R_Kalman = 0.1 * np.eye(12)
-        K_aug, P_aug, _ = ctrl.dlqr(self.dAugsys.A, self.dAugsys.B, Q_aug, R_aug) # 4*13, 13*13
+        R_Kalman = 0.1 * np.eye(self.n_states)
+        K_aug, P_aug, _ = ctrl.dlqr(self.dsys.A, self.dsys.B, Q_aug, R_aug) # 4*13, 13*13
 
         # Kalman Gain
-        X_kalman, _, _ = ctrl.dare(self.dAugsys.A.T, self.dAugsys.C.T, Q_Kalman, R_Kalman)  # 13*13, 13*1
-        L_kalman = np.linalg.inv(self.dAugsys.C @ X_kalman @ self.dAugsys.C.T + R_Kalman) @ self.dAugsys.C @ X_kalman @ self.dAugsys.A.T # 12*13
+        X_kalman, _, _ = ctrl.dare(self.dsys.A.T, self.dsys.C.T, Q_Kalman, R_Kalman)  # 13*13, 13*1
+        L_kalman = np.linalg.inv(self.dsys.C @ X_kalman @ self.dsys.C.T + R_Kalman) @ self.dsys.C @ X_kalman @ self.dsys.A.T # 12*13
         L_obs = L_kalman.T   # 13*12
-        CL_poles = np.linalg.eigvals(self.dAugsys.A - self.dAugsys.B @ K_aug)
-        print(CL_poles, '\n\n', np.linalg.eigvals(self.dAugsys.A - L_obs @ self.dAugsys.C))
-
+        CL_poles = np.linalg.eigvals(self.dsys.A - self.dsys.B @ K_aug)
+        print(CL_poles, '\n\n', np.linalg.eigvals(self.dsys.A - L_obs @ self.dsys.C))
         return L_obs, K_aug
 
     def mpc(self, x0, x_ref, u_ref, Q=np.eye(12), R=np.eye(4), N=10, Qf=np.eye(12), dynamic=False):
@@ -192,16 +195,35 @@ class Quadrotor:
         x_ref, u_ref = x.value, u.value
         return x_ref, u_ref
 
-    def step(self, x, x_ref, u_ref, cont_type="LQR", sim_system="linear", parms=None):
+    def initiate(self, feedback="state"):
+        # linearize system dynamics
+        x_operating = np.zeros((12, 1))
+        u_operating = np.array([10, 0, 0, 0]).reshape((-1, 1))  # hovering (mg 0 0 0)
+        sys_cont = self.linearize(x_operating, u_operating)  # continuous, linearized system
+        self.dsys = self.discretize(sys_cont, self.dt)
+        if feedback == "state":
+            self.K, self.P = self.make_dlqr_controller(parms=parms)
+        elif feedback == "output":
+            self.n_disturbance = 1
+            Bd = np.array([1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]).reshape((12, 1))  # input disturbance
+            Cd = np.array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]).reshape((12, 1))  # output disturbance
+            self.dsys.A, self.dsys.B, self.dsys.C, self.dsys.D = self.augment_system(Bd, Cd)
+
+        else:
+            raise ValueError("No correct feedback mode specified in initiate().")
+        print(f"The {feedback}-feedback system has been built.")
+        return
+
+    def step(self, x, x_ref, u_ref, ct_type="LQR", sim_system="linear", parms=None):
         # discrete step
-        if cont_type == "LQR":
+        if ct_type == "LQR":
             u = self.K @ (x_ref - x)
-        elif cont_type == "c-LQR":  # constrained LQR
+        elif ct_type == "c-LQR":  # constrained LQR
             u = self.K @ (x_ref - x)
             u_max = np.array([30, 1.4715, 1.4715, 0.0196])
             u_min = np.array([-10, -1.4715, -1.4715, -0.0196])
             u = np.clip(u, u_min, u_max)  # saturation function
-        elif cont_type == "MPC":
+        elif ct_type == "MPC":
             try:
                 u_ref = np.zeros(4)
                 u, _ = self.mpc(x, x_ref, u_ref, Q=parms["Q"], R=parms["R"], N=parms["N"], Qf=parms["Qf"], dynamic=parms["dynamic"])
