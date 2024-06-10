@@ -26,7 +26,7 @@ H, h = max_control_admissable_set(drone_model.dsys.A, drone_model.dsys.B, drone_
 print('H:', H.shape, type(H))   
 print('h:', h.shape, type(h))
 
-x0_tested = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]  # [-20, 5, 0, 0, 0, 5, 0, 0, 0, 0, 0, 0]
+x0_tested = [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]  # [-20, 5, 0, 0, 0, 5, 0, 0, 0, 0, 0, 0]
 if np.all(np.dot(H, x0_tested) <= h):
     print('x0 is in the set X_f')
 else:
@@ -50,10 +50,16 @@ for k in range(time_steps-1):
     x_currentMPC = x_bagMPC[:, k]
     x_currentLQR = x_bagLQR[:, k]
 
-    # MPC
+    # # MPC
     x_nextMPC, uMPC = drone_model.step(x_currentMPC, x_ref_current, u_ref_current, cont_type="MPC", sim_system="linear", parms=parms)
     x_bagMPC[:, k + 1] = x_nextMPC
     u_bagMPC[:, k + 1] = uMPC
+
+    # Real-MPC
+    # uMPC = drone_model.real_mpc(x_currentMPC, x_ref_current, u_ref_current, Q=parms["Q"], R=parms["R"], N=parms["N"], Qf=parms["Qf"], dynamic=True)
+    # x_nextMPC = drone_model.dsys.A @ x_currentLQR + drone_model.dsys.B @ uMPC
+    # x_bagMPC[:, k + 1] = x_nextMPC
+    # u_bagMPC[:, k + 1] = uMPC
 
     # Finite Horizon Unconstrained LQR
     uLQR, _ = drone_model.Nlqr(x_currentLQR, x_ref_current, u_ref_current, Q=parms["Q"], R=parms["R"], N=parms["N"], Qf=parms["Qf"], dynamic=False)

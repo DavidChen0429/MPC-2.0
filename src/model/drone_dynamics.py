@@ -114,7 +114,7 @@ class Quadrotor:
         # C matrix becomes [C Cd]
         self.nd = len(d)
         Bd = np.array([1,0,0,0,0,0,0,0,0,0,0,0]).reshape((12, 1)) # disturbance on x
-        Cd = np.array([0,0,0,0,0,0,0,0,0,0,0,0]).reshape((12, 1)) # measure only x
+        Cd = np.array([1,0,0,0,0,0,0,0,0,0,0,0]).reshape((12, 1)) # measure only x
         A_aug = np.vstack([np.hstack([self.dsys.A, Bd]), np.hstack([np.zeros((1, self.n_states)), np.eye(1)*0.9999])]) # 13x13
         B_aug = np.vstack([self.dsys.B, np.zeros((1, self.n_inputs))])  # 13x4
         C_aug = np.hstack([self.dsys.C, Cd])    # 12x13
@@ -156,6 +156,36 @@ class Quadrotor:
         print(CL_poles, '\n\n', np.linalg.eigvals(self.dAugsys.A - L_obs @ self.dAugsys.C))
 
         return L_obs, K_aug
+
+    def real_mpc(self, x0, x_ref, u_ref, Q=np.eye(12), R=np.eye(4), N=10, Qf=np.eye(12), dynamic=False):
+        u = cp.Variable((4, N))
+        x = [x0]
+        cost = 0
+
+        for i in range(N):
+            if i > 0:
+                x_next = self.dsys.A @ x[-1] + self.dsys.B @ u[:, i-1]
+                x.append(x_next)
+            cost += cp.quad_form(x[-1] - x_ref.T, Q) + cp.quad_form(u[:, i] - u_ref, R)
+
+        cost += cp.quad_form(x[-1] - x_ref.T, Qf)
+        obj = cp.Minimize(cost)
+        x = cp.hstack(x)
+        x = x.reshape((12, 10))
+        cons = []
+        u_max = np.array([30, 1.4715, 1.4715, 0.0196])
+        u_min = np.array([-10, -1.4715, -1.4715, -0.0196])
+
+        if dynamic:
+            cons += [u <= np.array([u_max]).reshape(-1, 1), u >= np.array([u_min]).reshape(-1, 1)]  # Input limits
+            cons += [x[3:5, :] <= 0.5*np.pi*np.ones((2,1)), x[3:5,:] >= -0.5*np.pi*np.ones((2, 1))]   # Pitch and roll limit
+            cons += [x[6:9, :] <= 2*np.ones((3,1)), x[6:9,:] >= -2*np.ones((3, 1))]                   # Speed limit
+            cons += [x[9:12, :] <= 3*np.pi*np.ones((3,1)), x[9:12,:] >= -3*np.pi*np.ones((3, 1))]     # Angular speed limit
+
+        prob = cp.Problem(obj, cons)
+        prob.solve(verbose=False)
+        
+        return u.value[:, 0]
 
     def mpc(self, x0, x_ref, u_ref, Q=np.eye(12), R=np.eye(4), N=10, Qf=np.eye(12), dynamic=False):
         x = cp.Variable((12, N))

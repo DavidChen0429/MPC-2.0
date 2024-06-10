@@ -1,21 +1,21 @@
 ================== Stability Textbook Note =========================
 Assumption 2.2 Continuity of system and cost: the system function, state and input constraint set, cost function are continuous and have zero value when zero.
 
-Assumption 2.3 Properties of constraint sets: The constraint set is closed and the terminal region is compact (closed and bounded), each set contains the origin. If the input constraint set is bounded, then u(x) is compact for all x. This basically assumed that the desired eqauilibrium pair is (x,u)=(0,0)
+Assumption 2.3 Properties of constraint sets: The constraint set is closed and the terminal region is compact (closed and bounded), each set contains the origin. If the input constraint set is bounded, then u(x) is compact for all x. This basically assumed that the desired equilibrium pair is (x,u)=(0,0)
 
 Definition 2.12 Lyapunov function + Theorem 2.13 Lyapunov stability theorem: If the Lyapunov function exists, stability of a system can be proven
 
-Assumption 2.14 Basic stability assumption: Stability can be proven if there exist a control invarant set and lyapunov decrease within the terminal set
+Assumption 2.14 Basic stability assumption: Stability can be proven if there exist a control invariant set and Lyapunov decrease within the terminal set
 
-Chapter 2.5.4 Linear systems with control and state constraints: If assumption 2.2, 2.3 and 2.14 are satisfied, and the terminal region Xf contains the origin in its interior, by theorems 2.19(asymptotic stability of the origin) and 2.21(lyapunov function and exponential stability), the origin is exponentially stable in Xn(set of feasible states for optimal control problem at stage N)
+Chapter 2.5.4 Linear systems with control and state constraints: If assumption 2.2, 2.3 and 2.14 are satisfied, and the terminal region Xf contains the origin in its interior, by theorems 2.19(asymptotic stability of the origin) and 2.21(Lyapunov function and exponential stability), the origin is exponentially stable in Xn(set of feasible states for optimal control problem at stage N)
 
 ==================== Logic for proving stability =====================
 Explain what is stability ----> Estimate Xf ----> Use Xf to estimate XN ----> Confirm assumption 2.2, 2.3, and 2.14
 
 ==================== Two important questions to answer to stability of MPC =====================
 1. Why do we need control invariant set? 
-ans: We need it because of the constraints, especially the input constraint. It is true that the Lyapunov stability theorm also has the similar meaning, but that's for system without any constraints. However, when adding input constraints to the system, the original region of attraction that Lyapunov stability theorem directly applied might be instable because it needs a input larger than the upperbound to bring the state back to the region. Thus, the control invarant set is created to handle that sitatuion by projecting the input constraints into the state region, in which stability is guaranteed under the existence of input constraints.
-2. Why do we need to porve Lyapunov decrease?
+ans: We need it because of the constraints, especially the input constraint. It is true that the Lyapunov stability theorem also has the similar meaning, but that's for system without any constraints. However, when adding input constraints to the system, the original region of attraction that Lyapunov stability theorem directly applied might be instable because it needs a input larger than the upper bound to bring the state back to the region. Thus, the control invariant set is created to handle that situation by projecting the input constraints into the state region, in which stability is guaranteed under the existence of input constraints.
+2. Why do we need to prove Lyapunov decrease?
 ans: XXXXXXXXX
 
 ==================== Feedback from Luyao =====================
@@ -23,16 +23,8 @@ The dynamic of the system does not matter that much except the system is super n
 Typos
 Compare different definition of the terminal cost Vf
 The estimation of Xn is weird 
-Be specfic to the system (the source of distrubance, definition of different term when justifying assumptions)
-Our prove for stability is like what the textbook says, but rather than what we intrepret
-
-==================== Strcuture of the Report =====================
-Abstract
-Introduction
-MPC Design 
-Stability Anlaysis 
-Numerical Simulation
-Conclusion
+Be specific to the system (the source of disturbance, definition of different term when justifying assumptions)
+Our prove for stability is like what the textbook says, but rather than what we interpret
 
 ==================== Reference MATLAB Code =====================
 Output feedback MPC				Exercise 5, Offset-free MPC, a simple example 

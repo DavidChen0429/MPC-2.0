@@ -47,11 +47,11 @@ def max_control_admissable_set(A, B, K, x_lim, u_lim):
 
     while not exit_flag:
         print(f"\tX_f generation, k = {t}")
-        H = np.vstack([H, K @ np.linalg.matrix_power(A_K, t), 
+        H = np.vstack([K @ np.linalg.matrix_power(A_K, t), 
                        -K @ np.linalg.matrix_power(A_K, t), 
                        np.linalg.matrix_power(A_K, t), 
-                       -np.eye(nx) @ np.linalg.matrix_power(A_K, t)])
-        h = np.hstack([h, f])
+                       -np.eye(nx) @ np.linalg.matrix_power(A_K, t), H])
+        h = np.hstack([f, h])
         J = np.vstack([K @ np.linalg.matrix_power(A_K, t+1),
                        -K @ np.linalg.matrix_power(A_K, t+1),
                        np.linalg.matrix_power(A_K, t+1),
