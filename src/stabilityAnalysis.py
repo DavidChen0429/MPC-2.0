@@ -55,12 +55,6 @@ for k in range(time_steps-1):
     x_bagMPC[:, k + 1] = x_nextMPC
     u_bagMPC[:, k + 1] = uMPC
 
-    # Real-MPC
-    # uMPC = drone_model.real_mpc(x_currentMPC, x_ref_current, u_ref_current, Q=parms["Q"], R=parms["R"], N=parms["N"], Qf=parms["Qf"], dynamic=True)
-    # x_nextMPC = drone_model.dsys.A @ x_currentLQR + drone_model.dsys.B @ uMPC
-    # x_bagMPC[:, k + 1] = x_nextMPC
-    # u_bagMPC[:, k + 1] = uMPC
-
     # Finite Horizon Unconstrained LQR
     uLQR, _ = drone_model.Nlqr(x_currentLQR, x_ref_current, u_ref_current, Q=parms["Q"], R=parms["R"], N=parms["N"], Qf=parms["Qf"], dynamic=False)
     x_nextLQR = drone_model.dsys.A @ x_currentLQR + drone_model.dsys.B @ uLQR
