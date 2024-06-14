@@ -182,40 +182,12 @@ class Quadrotor:
         return u.value[:, 0], x.value
     
     def Nlqr(self, x0, x_ref, u_ref, Q=np.eye(12), R=np.eye(4), N=10, Qf=np.eye(12), dynamic=False):
-        x = cp.Variable((12, N-1))  # x_1 to x_{N-1}
-        u = cp.Variable((4, N-1))   # u_0 to u_{N-2}
-        xn = cp.Variable((12, 2))   # x_{N-1} and x_N
-        un = cp.Variable((4, 2))    # u_{N-2} and u_{N-1}
-        cost = sum(cp.quad_form(x[:, i] - x_ref.T, Q) + cp.quad_form(u[:, i] - u_ref, R) for i in range(N-2))  # stage cost
-        obj = cp.Minimize(cost)
-
-        cons = [x[:, 0] == x0]
-        for i in range(1, N-1):
-            cons += [x[:, i] == self.dsys.A @ x[:, i-1] + self.dsys.B @ u[:, i-1]]
-
-        u_max = np.array([30, 1.4715, 1.4715, 0.0196])
-        u_min = np.array([-10, -1.4715, -1.4715, -0.0196])
-
-        if dynamic==True:
-            cons += [u <= np.array([u_max]).T, u >= np.array([u_min]).T]                            # Input limit
-            cons += [x[3:5, :] <= 0.5*np.pi*np.ones((2,1)), x[3:5,:] >= -0.5*np.pi*np.ones((2, 1))]   # Pitch and roll limit
-            cons += [x[6:9, :] <= 2*np.ones((3,1)), x[6:9,:] >= -2*np.ones((3, 1))]                   # Speed limit
-            cons += [x[9:12, :] <= 3*np.pi*np.ones((3,1)), x[9:12,:] >= -3*np.pi*np.ones((3, 1))]     # Angular speed limit
-
-        prob = cp.Problem(obj, cons)
-        prob.solve(verbose=False)
-        #print(x.value.shape, u.value.shape) # (12, 9) (4, 9)
-
-        # solve the problem from N-2 to N
-        cons2 = [xn[:, 0] == x.value[:, -1]]
-        cost2 = cp.quad_form(un[:, 0] - u_ref, R) + cp.quad_form(xn[:, 1] - x_ref.T, Qf)
-        for j in range(1, 2):
-            cons2 += [xn[:, j] == self.dsys.A @ xn[:, j-1] + self.dsys.B @ un[:, j-1]]
-        prob2 = cp.Problem(cp.Minimize(cost2), cons2)
-        prob2.solve(verbose=False)
-        #print(xn.value.shape, un.value.shape) # (12, 2) (4, 2)
-
-        return un.value[:, 0], xn.value
+        K = Qf
+        for n in range(0, N-1):
+            K = Q + self.dsys.A.T @ K @ self.dsys.A - self.dsys.A.T @ K @ self.dsys.B @ np.linalg.inv(R + self.dsys.B.T @ K @ self.dsys.B) @ self.dsys.B.T @ K @ self.dsys.A
+        L = -np.linalg.inv(R + self.dsys.B.T @ K @ self.dsys.B) @ self.dsys.B.T @ K @ self.dsys.A # 4*12
+        u = L @ (x_ref - x0)    # 4*1
+        return u
 
     def ots(self, y_ref, parms):
         x = cp.Variable(self.n_states)
@@ -235,7 +207,7 @@ class Quadrotor:
         elif cont_type == "c-LQR":  # constrained LQR
             u = self.K @ (x_ref - x)
             u_max = np.array([30, 1.4715, 1.4715, 0.0196])
-            u_min = np.array([-30, -1.4715, -1.4715, -0.0196])
+            u_min = np.array([-10, -1.4715, -1.4715, -0.0196])
             u = np.clip(u, u_min, u_max)  # saturation function
         elif cont_type == "MPC":
             try:
@@ -254,7 +226,6 @@ class Quadrotor:
         else:
             raise ValueError("Sim system argument must be linear or non-linear.")
         return x_next, u
-
 
 def is_stablizable(A, B):
     n = A.shape[0]
@@ -275,12 +246,12 @@ def is_stablizable(A, B):
             print("The pair (A, B) is not stabilizable.")
 
 if __name__ == "__main__":
-    Q = np.eye(12)
-    parms = {"Q": Q, "R": np.eye(4), "N": 10, "Qf": Q, "dynamic": True}
+    Q = np.eye(12) * 10
+    R = np.eye(4)
+    N = 5
+    parms1 = {"Q": Q, "R": R, "N": N, "Qf": Q, "dynamic": True}
+    model1 = Quadrotor(parms1)
+    K, P = model1.make_dlqr_controller(parms1)
+    parms = {"Q": Q, "R": R, "N": N, "Qf": P, "dynamic": True}
     model = Quadrotor(parms)
-
-    # Augmented system
-    d = [0.1]
-    Bd = np.array([1,0,0,0,0,0,0,0,0,0,0,0]).reshape((12, 1)) # disturbance on x
-    Cd = np.array([0,0,0,0,0,0,0,0,0,0,0,0]).reshape((12, 1)) # measure only x
-    A_aug, B_aug, C_aug, D_aug = model.augment_sys_disturbance(d, Bd, Cd)
+    tryU = model.Nlqr(1, 1, 1, Q=parms["Q"], R=parms["R"], N=parms["N"], Qf=parms["Qf"], dynamic=False)

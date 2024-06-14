@@ -6,27 +6,28 @@ import numpy as np
 
 # define simulation parameters
 dt = 0.1
-t_final = 20.0  # seconds
+t_final = 10.0  # seconds
 time_steps = int(t_final / dt)
 time = np.linspace(0, t_final, time_steps)
 
 Q = np.eye(12)
-# Q = np.block([[np.eye(3) * 0.5, np.zeros((3, 9))],
-#               [np.zeros((9, 3)), np.eye(9)]])
-parms1 = {"Q": Q, "R": np.eye(4), "N": 10, "Qf": Q, "dynamic": True}
+R = np.eye(4)
+N = 5
+parms1 = {"Q": Q, "R": R, "N": N, "Qf": Q, "dynamic": True}
 drone_model1 = drone_dynamics.Quadrotor(parms1)
 K, P = drone_model1.make_dlqr_controller(parms1)
-parms = {"Q": Q, "R": np.eye(4), "N": 10, "Qf": P, "dynamic": True}
+parms = {"Q": Q, "R": R, "N": N, "Qf": P, "dynamic": True}
 drone_model = drone_dynamics.Quadrotor(parms)
 
 ################### Xf generation ###################
 x_lim = np.array([1000, 1000, 1000, np.pi/2, np.pi/2, 100, 2, 2, 2, 3*np.pi, 3*np.pi, 3*np.pi])
 u_lim = np.array([30, 1.4715, 1.4715, 0.0196])
+u_lim_lb = np.array([-10, -1.4715, -1.4715, -0.0196])
 H, h = max_control_admissable_set(drone_model.dsys.A, drone_model.dsys.B, drone_model.K, x_lim, u_lim)
 print('H:', H.shape, type(H))   
 print('h:', h.shape, type(h))
 
-x0_tested = [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]  # [-20, 5, 0, 0, 0, 5, 0, 0, 0, 0, 0, 0]
+x0_tested = [1, 0, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0]  # [-20, 5, 0, 0, 0, 5, 0, 0, 0, 0, 0, 0]
 if np.all(np.dot(H, x0_tested) <= h):
     print('x0 is in the set X_f')
 else:
@@ -56,11 +57,17 @@ for k in range(time_steps-1):
     u_bagMPC[:, k + 1] = uMPC
 
     # Finite Horizon Unconstrained LQR
-    uLQR, _ = drone_model.Nlqr(x_currentLQR, x_ref_current, u_ref_current, Q=parms["Q"], R=parms["R"], N=parms["N"], Qf=parms["Qf"], dynamic=False)
+    uLQR = drone_model.Nlqr(x_currentLQR, x_ref_current, u_ref_current, Q=parms["Q"], R=parms["R"], N=parms["N"], Qf=parms["Qf"], dynamic=False)
     x_nextLQR = drone_model.dsys.A @ x_currentLQR + drone_model.dsys.B @ uLQR
     x_bagLQR[:, k + 1] = x_nextLQR
     u_bagLQR[:, k + 1] = uLQR
 
+    # x_nextLQR, uLQR = drone_model.step(x_currentMPC, x_ref_current, u_ref_current, cont_type="LQR", sim_system="linear", parms=parms)
+    # x_nextLQR = np.clip(x_nextLQR, -x_lim, x_lim)
+    # uLQR = np.clip(uLQR, u_lim_lb, u_lim)
+    # x_bagLQR[:, k + 1] = x_nextLQR
+    # u_bagLQR[:, k + 1] = uLQR
+    
 plt.figure()
 plt.subplot(2, 2, 1)
 plt.step(time, x_bagMPC[0, :], '#1f77b4', label="x")
@@ -72,7 +79,7 @@ plt.step(time, x_ref[2, :], '#2ca02c', linestyle='--', label="z_ref")
 plt.xlabel("Time [s]")
 plt.ylabel("Position [m]")
 plt.title("MPC")
-plt.legend()
+plt.legend(loc='lower right')
 
 plt.subplot(2, 2, 2)
 plt.step(time, x_bagLQR[0, :], '#1f77b4', label="x")
@@ -84,7 +91,7 @@ plt.step(time, x_ref[2, :], '#2ca02c', linestyle='--', label="z_ref")
 plt.xlabel("Time [s]")
 plt.ylabel("Position [m]")
 plt.title("LQR")
-plt.legend()
+plt.legend(loc='lower right')
 
 plt.subplot(2, 2, 3)
 plt.step(time, x_bagMPC[3, :], '#1f77b4', label="phi")
@@ -95,7 +102,7 @@ plt.step(time, x_ref[4, :], '#ff7f0e', linestyle='--', label="theta_ref")
 plt.step(time, x_ref[5, :], '#2ca02c', linestyle='--', label="psi_ref")
 plt.xlabel("Time [s]")
 plt.ylabel("Angle [rad]")
-plt.legend()
+plt.legend(loc='lower right')
 
 plt.subplot(2, 2, 4)
 plt.step(time, x_bagLQR[3, :], '#1f77b4', label="phi")
@@ -106,7 +113,7 @@ plt.step(time, x_ref[4, :], '#ff7f0e', linestyle='--', label="theta_ref")
 plt.step(time, x_ref[5, :], '#2ca02c', linestyle='--', label="psi_ref")
 plt.xlabel("Time [s]")
 plt.ylabel("Angle [rad]")
-plt.legend()
+plt.legend(loc='lower right')
 
 plt.show()
 
