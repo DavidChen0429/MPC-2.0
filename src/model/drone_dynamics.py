@@ -114,7 +114,7 @@ class Quadrotor:
         # C matrix becomes [C Cd]
         self.nd = len(d)
         Bd = np.array([1,0,0,0,0,0,0,0,0,0,0,0]).reshape((12, 1)) # disturbance on x
-        Cd = np.array([1,0,0,0,0,0,0,0,0,0,0,0]).reshape((12, 1)) # measure only x
+        Cd = np.array([0,0,0,0,0,0,0,0,0,0,0,0]).reshape((12, 1)) # measure only x
         A_aug = np.vstack([np.hstack([self.dsys.A, Bd]), np.hstack([np.zeros((1, self.n_states)), np.eye(1)*0.9999])]) # 13x13
         B_aug = np.vstack([self.dsys.B, np.zeros((1, self.n_inputs))])  # 13x4
         C_aug = np.hstack([self.dsys.C, Cd])    # 12x13
@@ -194,6 +194,17 @@ class Quadrotor:
         u = cp.Variable(self.n_inputs)
         obj = cp.Minimize(cp.quad_form(x, parms["Q"]) + cp.quad_form(u, parms["R"]))
         const = [(np.eye(self.n_states) - self.dsys.A) @ x == self.dsys.B @ u]
+        const += [np.hstack([np.eye(3), np.zeros((3, 9))]) @ x == y_ref]
+        prob = cp.Problem(obj, const)
+        prob.solve(verbose=False)
+        x_ref, u_ref = x.value, u.value
+        return x_ref, u_ref
+
+    def ots_online(self, y_ref, dhat, parms):
+        x = cp.Variable(self.n_states)
+        u = cp.Variable(self.n_inputs)
+        obj = cp.Minimize(cp.quad_form(x, parms["Q"]) + cp.quad_form(u, parms["R"]))
+        const = [(np.eye(self.n_states) - self.dsys.A) @ x - self.dsys.B @ u == (parms["Bd"] * dhat).reshape((12,))]
         const += [np.hstack([np.eye(3), np.zeros((3, 9))]) @ x == y_ref]
         prob = cp.Problem(obj, const)
         prob.solve(verbose=False)
