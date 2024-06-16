@@ -5,8 +5,55 @@ import cvxpy as cp
 import matplotlib.pyplot as plt
 
 
+class Observer:
+    def __init__(self, model_sys, xhat_0, Bd, Cd, parms):
+        self.model_sys = model_sys
+        self.xhat = xhat_0
+
+        self.n_states = model_sys.A.shape[0]
+        self.n_inputs = model_sys.B.shape[1]
+        self.n_outputs = model_sys.C.shape[0]
+        self.n_disturbances = 1
+
+        # constructions
+        self.aug_sys = self.augment_system(Bd, Cd)
+        self.L = self.calc_gain(parms)
+        return
+
+    def augment_system(self, Bd, Cd):
+        A_aug = np.vstack([np.hstack([self.model_sys.A, Bd]), np.hstack([np.zeros((1, self.n_states)), np.eye(1)])]) # 13x13
+        B_aug = np.vstack([self.model_sys.B, np.zeros((1, self.n_inputs))])  # 13x4
+        print(self.model_sys.C.shape, Cd.shape)
+        C_aug = np.hstack([self.model_sys.C, Cd])    # 12x13
+        D_aug = np.zeros((self.n_outputs, self.n_inputs))
+        aug_sys = ctrl.ss(A_aug, B_aug, C_aug, D_aug)
+        return aug_sys
+
+    def calc_gain(self, parms):
+        Q_aug = np.eye(self.n_states + self.n_disturbances)
+        Q_aug[:self.n_states, :self.n_states] = parms["Q"]
+        R_aug = parms["R"]
+        Q_Kalman = 10 * np.eye(self.n_states + self.n_disturbances)
+        Q_Kalman[0][0] = 1
+        R_Kalman = 0.1 * np.eye(self.n_outputs)
+
+        # Kalman Gain
+        X_kalman, _, _ = ctrl.dare(self.aug_sys.A.T, self.aug_sys.C.T, Q_Kalman, R_Kalman)  # 13*13, 13*1
+        L_kalman = np.linalg.inv(self.aug_sys.C @ X_kalman @ self.aug_sys.C.T + R_Kalman) @ self.aug_sys.C @ X_kalman @ self.aug_sys.A.T  # 12*13
+        L_obs = L_kalman.T  # 13*12
+        # check that the gain has the correct dimensions
+        assert L_obs.shape == (self.n_states + self.n_disturbances, self.n_outputs)
+        #print(CL_poles, '\n\n', np.linalg.eigvals(self.dAugsys.A - L_obs @ self.dAugsys.C))
+        print(f"Observer poles are {[np.round(np.linalg.norm(p), 2) for p in np.linalg.eigvals(self.aug_sys.A - L_obs @ self.aug_sys.C)]}")
+        return L_obs
+
+    def step(self, u, y):
+        self.xhat = self.aug_sys.A @ self.xhat + self.aug_sys.B @ u + self.L @ (y - self.aug_sys.C @ self.xhat)
+        return self.xhat.copy()
+
+
 class Quadrotor:
-    def __init__(self, parms):
+    def __init__(self, x0):
         self.n_states = 12  # x, y, z, phi, theta, psi, derivatives of before
         self.n_inputs = 4  # F, Tx, Ty, Tz
         self.n_disturbance = 0  # number of disturbance states
@@ -25,6 +72,8 @@ class Quadrotor:
         #
         self.dsys = 0
         self.csys = 0
+
+        self.x0 = x0
 
         # # build dynamics etc
         # x_operating = np.zeros((12, 1))
@@ -78,9 +127,10 @@ class Quadrotor:
     def linearize(self, x_operating, u_operating):
         A = ca.Function("A", [self.x, self.u], [ca.jacobian(self.f, self.x)])(x_operating, u_operating)
         B = ca.Function("B", [self.x, self.u], [ca.jacobian(self.f, self.u)])(x_operating, u_operating)
-        C = np.eye(12)
-        D = np.zeros((self.n_states, self.n_inputs))
-
+        #C = np.eye(12)
+        #D = np.zeros((self.n_states, self.n_inputs))
+        C = np.hstack([np.eye(3), np.zeros((3, 9))])
+        D = np.zeros((3, 4))
         #make numerical matrices and cast into numpy array
         A = np.array(ca.DM(A))
         B = np.array(ca.DM(B))
@@ -98,19 +148,21 @@ class Quadrotor:
     def make_dlqr_controller(self, parms):
         x_operating = np.zeros((12, 1))
         u_operating = np.array([10, 0, 0, 0]).reshape((-1, 1))
-        A, B, C, D = self.linearize(x_operating, u_operating)
-        sys_continuous = ctrl.ss(A, B, C, D)
-        self.csys = sys_continuous
+        sys_continuous = self.linearize(x_operating, u_operating)
         sys_discrete = ctrl.c2d(sys_continuous, self.dt, method='zoh')
         self.dsys = sys_discrete
         K, P, _ = ctrl.dlqr(self.dsys.A, self.dsys.B, parms["Q"], parms["R"])
+        print(f"CL       poles are {[np.round(np.linalg.norm(p), 2) for p in np.linalg.eigvals(self.dsys.A - self.dsys.B @ K)]}")
         return K, P
 
-    def get_ss_bag_vectors(self, N):
+    def get_ss_bag_vectors(self, N, x_0, u_0, xhat_0):
         """N is the number of simulation steps, thus number of concatinated x vectors"""
         x_bag = np.zeros((self.n_states + self.n_disturbance, N))
         u_bag = np.zeros((self.n_inputs, N))
-        xhat_bag = x_bag.copy()
+        xhat_bag = np.zeros((xhat_0.shape[0], N))
+        x_bag[:, 0] = x_0
+        u_bag[:, 0] = u_0
+        xhat_bag[:, 0] = xhat_0
         return x_bag, u_bag, xhat_bag
     
     def augment_system(self, Bd, Cd):
@@ -195,51 +247,41 @@ class Quadrotor:
         x_ref, u_ref = x.value, u.value
         return x_ref, u_ref
 
-    def initiate(self, feedback="state"):
+    def initiate(self, parms):
         # linearize system dynamics
         x_operating = np.zeros((12, 1))
         u_operating = np.array([10, 0, 0, 0]).reshape((-1, 1))  # hovering (mg 0 0 0)
         sys_cont = self.linearize(x_operating, u_operating)  # continuous, linearized system
         self.dsys = self.discretize(sys_cont, self.dt)
-        if feedback == "state":
-            self.K, self.P = self.make_dlqr_controller(parms=parms)
-        elif feedback == "output":
-            self.n_disturbance = 1
-            Bd = np.array([1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]).reshape((12, 1))  # input disturbance
-            Cd = np.array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]).reshape((12, 1))  # output disturbance
-            self.dsys.A, self.dsys.B, self.dsys.C, self.dsys.D = self.augment_system(Bd, Cd)
-
-        else:
-            raise ValueError("No correct feedback mode specified in initiate().")
-        print(f"The {feedback}-feedback system has been built.")
+        self.K, self.P = self.make_dlqr_controller(parms=parms)
         return
 
-    def step(self, x, x_ref, u_ref, ct_type="LQR", sim_system="linear", parms=None):
+    def step(self, u, sim_system="linear"):
         # discrete step
-        if ct_type == "LQR":
-            u = self.K @ (x_ref - x)
-        elif ct_type == "c-LQR":  # constrained LQR
-            u = self.K @ (x_ref - x)
-            u_max = np.array([30, 1.4715, 1.4715, 0.0196])
-            u_min = np.array([-10, -1.4715, -1.4715, -0.0196])
-            u = np.clip(u, u_min, u_max)  # saturation function
-        elif ct_type == "MPC":
-            try:
-                u_ref = np.zeros(4)
-                u, _ = self.mpc(x, x_ref, u_ref, Q=parms["Q"], R=parms["R"], N=parms["N"], Qf=parms["Qf"], dynamic=parms["dynamic"])
-            except:
-                u = np.zeros(4)
-        else:
-            raise ValueError("Specified controller type not known.")
+        # if ct_type == "LQR":
+        #     u = self.K @ (x_ref - x)
+        # elif ct_type == "c-LQR":  # constrained LQR
+        #     u = self.K @ (x_ref - x)
+        #     u_max = np.array([30, 1.4715, 1.4715, 0.0196])
+        #     u_min = np.array([-10, -1.4715, -1.4715, -0.0196])
+        #     u = np.clip(u, u_min, u_max)  # saturation function
+        # elif ct_type == "MPC":
+        #     try:
+        #         u_ref = np.zeros(4)
+        #         u, _ = self.mpc(x, x_ref, u_ref, Q=parms["Q"], R=parms["R"], N=parms["N"], Qf=parms["Qf"], dynamic=parms["dynamic"])
+        #     except:
+        #         u = np.zeros(4)
+        # else:
+        #     raise ValueError("Specified controller type not known.")
 
         if sim_system == "linear":
-            x_next = self.dsys.A @ x + self.dsys.B @ u
+            self.x0 = self.dsys.A @ self.x0 + self.dsys.B @ u
         elif sim_system == "non-linear":
             u[0] += 10
-            x_next = np.array(self.compute_next_state(x, u).full()).squeeze()
+            self.x0 = np.array(self.compute_next_state(self.x0, u).full()).squeeze()
         else:
             raise ValueError("Sim system argument must be linear or non-linear.")
-        return x_next, u
+        return self.x0
 
 
 def is_stablizable(A, B):

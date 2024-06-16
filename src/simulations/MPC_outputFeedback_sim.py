@@ -1,4 +1,4 @@
-from src.model import drone_dynamics
+from src.model.drone_dynamics import Observer, Quadrotor
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -10,16 +10,15 @@ time = np.linspace(0, t_final, time_steps)
 
 Q = np.eye(12)
 parms = {"Q": Q, "R": np.eye(4), "N": 10, "Qf": Q, "dynamic": True}
-drone_model = drone_dynamics.Quadrotor(parms)
+drone_model = Quadrotor(parms)
+
 
 # Augment the system with a constant disturbance term d
 d = [1]
 Bd = np.array([1,0,0,0,0,0,0,0,0,0,0,0]).reshape((12, 1)) # disturbance on x
 Cd = np.array([0,0,0,0,0,0,0,0,0,0,0,0]).reshape(12, 1) # measure only x
-A_aug, B_aug, C_aug, D_aug = drone_model.augment_sys_disturbance(d, Bd, Cd)
+observer = Observer(drone_model.dsys, np.zeros(13), parms)
 
-# Design the observer
-Lobs, Klqr_aug = drone_model.luenberger_observer(parms)
 
 # Test the observer
 x_bag, u_bag = drone_model.get_ss_bag_vectors(time_steps) # np.zeros((self.n_states, N))
@@ -42,7 +41,7 @@ for k in range(time_steps-1):
     x_aug_current = x_aug_bag[:, k]
     x_ref_current = x_ref_aug[:, k]
     x_hat_current = x_aug_hat[:, k]
-    u = Klqr_aug @ (x_ref_current - x_aug_current)
+    u = drone_model.K @ (x_ref_current - x_aug_current)
     x_next = drone_model.dAugsys.A @ x_aug_current + drone_model.dAugsys.B @ u
     y = drone_model.dAugsys.C @ x_aug_current
 
