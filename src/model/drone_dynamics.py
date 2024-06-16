@@ -114,7 +114,7 @@ class Quadrotor:
         # C matrix becomes [C Cd]
         self.nd = len(d)
         Bd = np.array([1,0,0,0,0,0,0,0,0,0,0,0]).reshape((12, 1)) # disturbance on x
-        Cd = np.array([0,0,0,0,0,0,0,0,0,0,0,0]).reshape((12, 1)) # measure only x
+        Cd = np.array([1,0,0,0,0,0,0,0,0,0,0,0]).reshape((12, 1)) # measure only x
         A_aug = np.vstack([np.hstack([self.dsys.A, Bd]), np.hstack([np.zeros((1, self.n_states)), np.eye(1)*0.9999])]) # 13x13
         B_aug = np.vstack([self.dsys.B, np.zeros((1, self.n_inputs))])  # 13x4
         C_aug = np.hstack([self.dsys.C, Cd])    # 12x13
