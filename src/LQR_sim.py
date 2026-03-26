@@ -1,11 +1,13 @@
 # Simulate the LQR controller for hovering the drone at a single point
-from Model import drone_dynamics
-from Planner import trajectory_generation
+from src.model import drone_dynamics
+from src.planner import trajectory_generation
 import matplotlib.pyplot as plt
 import numpy as np
 import control as ctrl
 
-drone_model = drone_dynamics.Quadrotor()
+Q = np.eye(12)
+parms = {"Q": Q, "R": np.eye(4), "N": 10, "Qf": Q, "dynamic": True}
+drone_model = drone_dynamics.Quadrotor(parms)
 
 # define simulation parameters
 dt = 0.1 
@@ -36,7 +38,8 @@ x_ref = trajectory_generation.hover_traj(time_steps)  # reference trajectory (st
 for k in range(time_steps-1):
     x_current = x_bag[:, k]
     x_ref_current = x_ref[:, k]
-    x_next, u = drone_model.step(x_current, x_ref_current, cont_type="LQR")
+    u_ref = np.zeros(4)
+    x_next, u = drone_model.step(x_current, x_ref_current, u_ref, cont_type="LQR", sim_system="linear", parms=parms)
     x_bag[:, k+1] = x_next
     u_bag[:, k+1] = u
 

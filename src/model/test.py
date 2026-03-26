@@ -1,11 +1,12 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-from drone_dynamics import Quadrotor
-from trajectory_generation import test_traj
+from src.model.drone_dynamics import Quadrotor
+from src.planner.trajectory_generation import test_traj
 
-
-drone = Quadrotor()
+Q = np.eye(12)
+parms = {"Q": Q, "R": np.eye(4), "N": 10, "Qf": Q, "dynamic": True}
+drone = Quadrotor(parms)
 N = 100
 x_bag, u_bag = drone.get_ss_bag_vectors(N)  # arrays to bag the historical data of the states and inputs
 
@@ -17,7 +18,7 @@ x_bag[:, 0] = x0
 u_bag[:, 0] = u0
 
 for k in range(N-1):
-    x_bag[:, k+1] = drone.step(x_bag[:, k], x_ref[:, k])
+    x_bag[:, k+1], _ = drone.step(x_bag[:, k], x_ref[:, k], np.zeros(4))
 
 plt.plot(x_bag[0, :], '#1f77b4', label="x_x")
 plt.plot(x_ref[0,:], '#1f77b4', linestyle='--', label="x_x ref")

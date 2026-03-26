@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find D:/2_PhD_UBC/Code/MPC-2.0 -maxdepth 2 -type f -name *.md -o -name *CLAUDE* -o -name *cursor* -o -name .cursorrules)",
+      "Bash(find D:/2_PhD_UBC/Code/MPC-2.0 -not -path */.* -not -path */__pycache__/* -type f -name *.py -o -name *.md -o -name *.yml -o -name *.yaml -o -name *.txt -o -name *.m)",
+      "Bash(conda list:*)",
+      "Bash(cmd.exe /c \"conda list -n CtrlEng\")",
+      "Bash(cmd.exe /c \"conda list -n CtrlEng 2>&1\")",
+      "Bash(powershell.exe -Command \"conda list -n CtrlEng\" 2>&1)",
+      "Bash(powershell.exe -Command \"conda run -n CtrlEng pip install casadi cvxpy cvxopt pypoman numpy-stl pybullet pygame pandas networkx\" 2>&1)",
+      "Bash(powershell.exe -Command \"conda run -n CtrlEng python -c \\\\\"import casadi; import cvxpy; import cvxopt; import pypoman; import stl; import pybullet; import pygame; import pandas; import networkx; print\\('All imports OK'\\)\\\\\"\" 2>&1)",
+      "Bash(powershell.exe -Command \"conda run -n CtrlEng python -c \\\\\"import matplotlib; matplotlib.use\\('Agg'\\); from src.model import drone_dynamics; from src.planner import trajectory_generation; print\\('Imports OK'\\)\\\\\"\" 2>&1)",
+      "Bash(powershell.exe -Command \"conda run -n CtrlEng python -c \\\\\"import matplotlib; matplotlib.use\\('Agg'\\); import matplotlib.pyplot as plt; plt.show = lambda: None; exec\\(compile\\(open\\('src/LQR_sim.py'\\).read\\(\\), 'src/LQR_sim.py', 'exec'\\)\\)\\\\\"\" 2>&1)",
+      "Bash(powershell.exe -Command \"conda run -n CtrlEng python -c \\\\\"import matplotlib; matplotlib.use\\('Agg'\\); import matplotlib.pyplot as plt; plt.show = lambda: None; exec\\(compile\\(open\\('src/MPC_sim.py'\\).read\\(\\), 'src/MPC_sim.py', 'exec'\\)\\)\\\\\"\" 2>&1)",
+      "Bash(powershell.exe -Command \"conda run -n CtrlEng python -c \\\\\"import matplotlib; matplotlib.use\\('Agg'\\); import matplotlib.pyplot as plt; plt.show = lambda: None; exec\\(compile\\(open\\('src/simulations/simulation.py'\\).read\\(\\), 'src/simulations/simulation.py', 'exec'\\)\\)\\\\\"\" 2>&1)",
+      "Bash(powershell.exe -Command \"conda run -n CtrlEng python -c \\\\\"import matplotlib; matplotlib.use\\('Agg'\\); import matplotlib.pyplot as plt; plt.show = lambda: None; exec\\(compile\\(open\\('src/simulations/linear_vs_nonlinear.py'\\).read\\(\\), 'src/simulations/linear_vs_nonlinear.py', 'exec'\\)\\)\\\\\"\" 2>&1)",
+      "Bash(powershell.exe -Command \"conda run -n CtrlEng python -c \\\\\"import matplotlib; matplotlib.use\\('Agg'\\); import matplotlib.pyplot as plt; plt.show = lambda: None; exec\\(compile\\(open\\('src/estimateXf.py'\\).read\\(\\), 'src/estimateXf.py', 'exec'\\)\\)\\\\\"\" 2>&1)",
+      "Bash(powershell.exe -Command \"conda run -n CtrlEng python -c \\\\\"import matplotlib; matplotlib.use\\('Agg'\\); import matplotlib.pyplot as plt; plt.show = lambda: None; exec\\(compile\\(open\\('src/model/test.py'\\).read\\(\\), 'src/model/test.py', 'exec'\\)\\)\\\\\"\" 2>&1)",
+      "Bash(powershell.exe -Command \"conda run -n CtrlEng python -c \\\\\"import matplotlib; matplotlib.use\\('Agg'\\); import matplotlib.pyplot as plt; plt.show = lambda: None; exec\\(compile\\(open\\('src/simulations/MPC_outputFeedback_sim.py'\\).read\\(\\), 'src/simulations/MPC_outputFeedback_sim.py', 'exec'\\)\\)\\\\\"\" 2>&1)"
+    ]
+  }
+}

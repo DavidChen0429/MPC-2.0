@@ -10,7 +10,7 @@ only if O_t = O_{t+1} for some t. Based on the definition (2, 3) and Theorem 2.3
 the following optimization problem:
 """
 
-from Model import drone_dynamics
+from src.model import drone_dynamics
 import numpy as np
 from scipy.optimize import linprog
 
@@ -82,7 +82,9 @@ def max_control_admissable_set(A, B, K, x_lim, u_lim):
     
     return H, h
 
-drone_model = drone_dynamics.Quadrotor()
+Q = np.eye(12)
+parms = {"Q": Q, "R": np.eye(4), "N": 10, "Qf": Q, "dynamic": True}
+drone_model = drone_dynamics.Quadrotor(parms)
 A = drone_model.dsys.A  # (12, 12)
 B = drone_model.dsys.B  # (12, 4)
 C = drone_model.dsys.C  # (12, 12)

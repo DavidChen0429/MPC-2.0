@@ -28,13 +28,13 @@ for k in range(time_steps-1):
     x_ref_current = x_ref[:, k]
     # linear
     x = x_bag[:, k]
-    x_next, u = drone_model.step(x, x_ref_current, cont_type="MPC", sim_system="linear", parms=parms)
+    x_next, u = drone_model.step(x, x_ref_current, np.zeros(4), cont_type="MPC", sim_system="linear", parms=parms)
     x_bag[:, k + 1] = x_next
     u_bag[:, k + 1] = u
 
     # non-linear
     x = x_bag_nl[:, k]
-    x_next, u = drone_model.step(x, x_ref_current, cont_type="MPC", sim_system="non-linear", parms=parms)
+    x_next, u = drone_model.step(x, x_ref_current, np.zeros(4), cont_type="MPC", sim_system="non-linear", parms=parms)
     x_bag_nl[:, k+1] = x_next
     u_bag_nl[:, k+1] = u
 

@@ -49,4 +49,3 @@ dependencies:
       - typing-extensions==4.8.0
       - tzdata==2023.4
       - zipp==3.17.0
-prefix: C:\Users\LeonK\miniconda3\envs\scientific
