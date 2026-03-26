@@ -16,7 +16,9 @@
       "Bash(powershell.exe -Command \"conda run -n CtrlEng python -c \\\\\"import matplotlib; matplotlib.use\\('Agg'\\); import matplotlib.pyplot as plt; plt.show = lambda: None; exec\\(compile\\(open\\('src/simulations/linear_vs_nonlinear.py'\\).read\\(\\), 'src/simulations/linear_vs_nonlinear.py', 'exec'\\)\\)\\\\\"\" 2>&1)",
       "Bash(powershell.exe -Command \"conda run -n CtrlEng python -c \\\\\"import matplotlib; matplotlib.use\\('Agg'\\); import matplotlib.pyplot as plt; plt.show = lambda: None; exec\\(compile\\(open\\('src/estimateXf.py'\\).read\\(\\), 'src/estimateXf.py', 'exec'\\)\\)\\\\\"\" 2>&1)",
       "Bash(powershell.exe -Command \"conda run -n CtrlEng python -c \\\\\"import matplotlib; matplotlib.use\\('Agg'\\); import matplotlib.pyplot as plt; plt.show = lambda: None; exec\\(compile\\(open\\('src/model/test.py'\\).read\\(\\), 'src/model/test.py', 'exec'\\)\\)\\\\\"\" 2>&1)",
-      "Bash(powershell.exe -Command \"conda run -n CtrlEng python -c \\\\\"import matplotlib; matplotlib.use\\('Agg'\\); import matplotlib.pyplot as plt; plt.show = lambda: None; exec\\(compile\\(open\\('src/simulations/MPC_outputFeedback_sim.py'\\).read\\(\\), 'src/simulations/MPC_outputFeedback_sim.py', 'exec'\\)\\)\\\\\"\" 2>&1)"
+      "Bash(powershell.exe -Command \"conda run -n CtrlEng python -c \\\\\"import matplotlib; matplotlib.use\\('Agg'\\); import matplotlib.pyplot as plt; plt.show = lambda: None; exec\\(compile\\(open\\('src/simulations/MPC_outputFeedback_sim.py'\\).read\\(\\), 'src/simulations/MPC_outputFeedback_sim.py', 'exec'\\)\\)\\\\\"\" 2>&1)",
+      "Bash(conda run:*)",
+      "Bash(python -m src.MPC_sim)"
     ]
   }
 }

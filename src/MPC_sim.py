@@ -5,8 +5,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 Q = np.eye(12)
-parms = {"Q": Q, "R": np.eye(4), "N": 10, "Qf": Q, "dynamic": True}
+R = np.eye(4)
+parms = {"Q": Q, "R": R, "N": 10, "Qf": Q, "dynamic": True}
 drone_model = drone_dynamics.Quadrotor(parms)
+parms["Qf"] = drone_model.P  # Use DARE solution as terminal cost
 
 # define simulation parameters
 dt = 0.1 
